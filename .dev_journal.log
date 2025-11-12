@@ -1,2 +1,3 @@
 [2025-11-11 13:38:47 +0530] Add custom interceptor for handling 401 Unauthorized
 [2025-11-12 22:19:32 +0530] Implement UI tests for the login and clock-in flow
+[2025-11-12 09:05:11 +0530] Implement biometric authentication (Fingerprint/FaceID) for quick login
