@@ -2,3 +2,4 @@
 [2025-11-12 22:19:32 +0530] Implement UI tests for the login and clock-in flow
 [2025-11-12 09:05:11 +0530] Implement biometric authentication (Fingerprint/FaceID) for quick login
 [2025-11-13 18:13:27 +0530] Implement custom dialog for forced updates
+[2025-11-13 21:22:24 +0530] Optimize APK size by enabling ProGuard and R8
