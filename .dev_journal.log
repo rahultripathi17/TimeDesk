@@ -8,3 +8,4 @@
 [2025-11-15 20:19:23 +0530] Improve splash screen transition to dashboard
 [2025-11-16 18:46:30 +0530] Implement infinite scrolling pagination for older time logs
 [2025-11-20 13:20:22 +0530] Optimize Room queries for faster timesheet loading
+[2025-11-20 09:11:35 +0530] Create base Application class and setup dependency injection
