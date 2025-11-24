@@ -1,0 +1,20 @@
+{
+  "name": "TimeDesk",
+  "short_name": "TimeDesk",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/timedesk-logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/timedesk-logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
