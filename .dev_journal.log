@@ -11,3 +11,4 @@
 [2025-11-20 09:11:35 +0530] Create base Application class and setup dependency injection
 [2025-11-22 11:41:22 +0530] Refactor ViewModels to use Kotlin StateFlow
 [2025-11-24 16:27:08 +0530] Add support for push notifications on new task assignments
+[2025-11-24 22:20:44 +0530] Add setup instructions for the backend mock server
