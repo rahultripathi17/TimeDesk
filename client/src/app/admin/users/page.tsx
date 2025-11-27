@@ -1,0 +1,484 @@
+"use client";
+
+import { AppShell } from "@/components/layout/AppShell";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Search, Plus, MoreHorizontal, Users, UserCog, UserCheck, User } from "lucide-react";
+import Link from "next/link";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { useState, useEffect } from "react";
+import { cn } from "@/lib/utils";
+import { supabase } from "@/utils/supabase/client";
+
+const DEPARTMENTS = [
+    "Engineering",
+    "Product",
+    "Human Resources",
+    "Sales",
+    "Marketing",
+    "Finance",
+    "Operations",
+    "Design",
+];
+
+export default function UsersListPage() {
+    const [users, setUsers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [departmentFilter, setDepartmentFilter] = useState("all");
+
+    // Action States
+    const [viewUser, setViewUser] = useState<any | null>(null);
+    const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    useEffect(() => {
+        fetchUsers();
+    }, []);
+
+    const fetchUsers = async () => {
+        try {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('profiles')
+                .select(`
+                    *,
+                    user_details (*),
+                    attendance (
+                        status
+                    )
+                `);
+
+            if (error) throw error;
+
+            // Process data to include today's status
+            const today = new Date().toISOString().split('T')[0];
+            const processedUsers = data.map((user: any) => {
+                const todayAttendance = user.attendance?.find((a: any) => a.date === today);
+                return {
+                    ...user,
+                    status: todayAttendance?.status || 'absent', // Default to absent if no record
+                    initials: getInitials(user.full_name),
+                    details: user.user_details // Store details
+                };
+            });
+
+            setUsers(processedUsers);
+        } catch (error) {
+            console.error('Error fetching users:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const getInitials = (name: string) => {
+        if (!name) return "U";
+        const parts = name.trim().split(" ");
+        if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    };
+
+    const handleDeleteUser = async () => {
+        if (!deleteUserId) return;
+
+        setIsDeleting(true);
+        try {
+            const response = await fetch(`/api/admin/users?id=${deleteUserId}`, {
+                method: 'DELETE',
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to delete user');
+            }
+
+            toast.success("User deleted successfully");
+            setUsers(users.filter(u => u.id !== deleteUserId));
+            setDeleteUserId(null);
+        } catch (error: any) {
+            console.error("Delete error:", error);
+            toast.error(error.message);
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    // Filter users
+    const filteredUsers = users.filter((user) => {
+        const matchesSearch =
+            user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            user.username.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesDepartment =
+            departmentFilter === "all" || user.department === departmentFilter;
+        return matchesSearch && matchesDepartment;
+    });
+
+    // Compute stats
+    const totalUsers = users.length;
+    const managersCount = users.filter((u) => u.role === "manager").length;
+    const employeesCount = users.filter((u) => u.role === "employee").length;
+    const hrCount = users.filter((u) => u.role === "hr").length;
+
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case "available":
+                return "bg-green-100 text-green-700 hover:bg-green-100";
+            case "remote":
+                return "bg-blue-100 text-blue-700 hover:bg-blue-100";
+            case "leave":
+                return "bg-amber-100 text-amber-700 hover:bg-amber-100";
+            case "absent":
+                return "bg-red-100 text-red-700 hover:bg-red-100";
+            default:
+                return "bg-slate-100 text-slate-700 hover:bg-slate-100";
+        }
+    };
+
+    return (
+        <AppShell role="admin">
+            <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                    <div>
+                        <h1 className="text-lg font-semibold text-slate-900">Users & Roles</h1>
+                        <p className="text-xs text-slate-500">
+                            Manage all users, their roles, and permissions.
+                        </p>
+                    </div>
+                    <Link href="/admin/users/new">
+                        <Button className="bg-blue-600 hover:bg-blue-700">
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add New User
+                        </Button>
+                    </Link>
+                </div>
+
+                {/* Stats Cards */}
+                <div className="grid gap-4 md:grid-cols-4 mb-6">
+                    <Card>
+                        <CardContent className="p-4 flex items-center gap-4">
+                            <div className="p-2 bg-blue-50 rounded-full">
+                                <Users className="h-5 w-5 text-blue-600" />
+                            </div>
+                            <div>
+                                <p className="text-xs font-medium text-slate-500">Total Users</p>
+                                <h3 className="text-xl font-bold text-slate-900">{totalUsers}</h3>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-4 flex items-center gap-4">
+                            <div className="p-2 bg-purple-50 rounded-full">
+                                <UserCog className="h-5 w-5 text-purple-600" />
+                            </div>
+                            <div>
+                                <p className="text-xs font-medium text-slate-500">Managers</p>
+                                <h3 className="text-xl font-bold text-slate-900">{managersCount}</h3>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-4 flex items-center gap-4">
+                            <div className="p-2 bg-green-50 rounded-full">
+                                <User className="h-5 w-5 text-green-600" />
+                            </div>
+                            <div>
+                                <p className="text-xs font-medium text-slate-500">Employees</p>
+                                <h3 className="text-xl font-bold text-slate-900">{employeesCount}</h3>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-4 flex items-center gap-4">
+                            <div className="p-2 bg-orange-50 rounded-full">
+                                <UserCheck className="h-5 w-5 text-orange-600" />
+                            </div>
+                            <div>
+                                <p className="text-xs font-medium text-slate-500">HR</p>
+                                <h3 className="text-xl font-bold text-slate-900">{hrCount}</h3>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <Card>
+                    <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 space-y-0 pb-4">
+                        <CardTitle className="text-base font-medium">All Users</CardTitle>
+                        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                            <div className="relative w-full sm:w-64">
+                                <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-500" />
+                                <Input
+                                    placeholder="Search users..."
+                                    className="pl-8 h-9 text-sm"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                            </div>
+                            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                                <SelectTrigger className="w-full sm:w-[180px] h-9 text-sm">
+                                    <SelectValue placeholder="Filter by Department" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Departments</SelectItem>
+                                    {DEPARTMENTS.map((dept) => (
+                                        <SelectItem key={dept} value={dept}>
+                                            {dept}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>User</TableHead>
+                                    <TableHead>Role</TableHead>
+                                    <TableHead>Designation</TableHead>
+                                    <TableHead>Department</TableHead>
+                                    <TableHead>Today's Status</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredUsers.length > 0 ? (
+                                    filteredUsers.map((user) => (
+                                        <TableRow key={user.id}>
+                                            <TableCell className="font-medium">
+                                                <div className="flex items-center gap-3">
+                                                    <Avatar className="h-9 w-9">
+                                                        <AvatarImage src="" />
+                                                        <AvatarFallback className="bg-blue-50 text-blue-600 text-xs">
+                                                            {user.initials}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <div>
+                                                        <div className="font-medium text-sm text-slate-900">{user.full_name}</div>
+                                                        <div className="text-xs text-slate-500">{user.email || user.username}</div>
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline" className="font-normal capitalize">
+                                                    {user.role}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-sm text-slate-600">{user.designation}</TableCell>
+                                            <TableCell className="text-sm text-slate-600">{user.department}</TableCell>
+                                            <TableCell>
+                                                <Badge
+                                                    variant="secondary"
+                                                    className={cn("font-normal capitalize", getStatusColor(user.status))}
+                                                >
+                                                    {user.status}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" className="h-8 w-8 p-0">
+                                                            <span className="sr-only">Open menu</span>
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                        <DropdownMenuItem onClick={() => setViewUser(user)}>
+                                                            View details
+                                                        </DropdownMenuItem>
+                                                        <Link href={`/admin/users/new?id=${user.id}`}>
+                                                            <DropdownMenuItem>
+                                                                Edit user
+                                                            </DropdownMenuItem>
+                                                        </Link>
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem
+                                                            className="text-red-600 focus:text-red-600"
+                                                            onClick={() => setDeleteUserId(user.id)}
+                                                        >
+                                                            Delete user
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="h-24 text-center">
+                                            No users found.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* View User Dialog */}
+            <Dialog open={!!viewUser} onOpenChange={(open) => !open && setViewUser(null)}>
+                <DialogContent className="max-w-3xl">
+                    <DialogHeader className="border-b pb-4">
+                        <DialogTitle>User Profile</DialogTitle>
+                    </DialogHeader>
+                    {viewUser && (
+                        <div className="py-2">
+                            {/* Header Section */}
+                            <div className="flex flex-col md:flex-row items-center md:items-start gap-6 mb-8">
+                                <Avatar className="h-24 w-24 border-4 border-white shadow-sm">
+                                    <AvatarImage src={viewUser.avatar_url} />
+                                    <AvatarFallback className="text-3xl bg-blue-50 text-blue-600 font-semibold">
+                                        {viewUser.initials}
+                                    </AvatarFallback>
+                                </Avatar>
+                                <div className="text-center md:text-left space-y-2 flex-1">
+                                    <div>
+                                        <h3 className="text-2xl font-bold text-slate-900">{viewUser.full_name}</h3>
+                                        <p className="text-slate-500">{viewUser.email}</p>
+                                    </div>
+                                    <div className="flex flex-wrap justify-center md:justify-start gap-2">
+                                        <Badge variant="secondary" className="px-3 py-1 text-sm font-medium capitalize">
+                                            {viewUser.role}
+                                        </Badge>
+                                        <Badge variant="outline" className={cn("px-3 py-1 text-sm font-medium capitalize border-0", getStatusColor(viewUser.status))}>
+                                            {viewUser.status}
+                                        </Badge>
+                                        {viewUser.details?.city && (
+                                            <Badge variant="outline" className="px-3 py-1 text-sm font-normal text-slate-600">
+                                                📍 {viewUser.details.city}, {viewUser.details.state}
+                                            </Badge>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Details Grid */}
+                            <div className="grid md:grid-cols-2 gap-8">
+                                {/* Professional Details */}
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2 text-slate-900 font-semibold border-b pb-2">
+                                        <Users className="h-4 w-4" />
+                                        <h4>Professional Details</h4>
+                                    </div>
+                                    <div className="grid gap-4">
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-slate-500">Designation</span>
+                                            <span className="col-span-2 font-medium text-slate-900">{viewUser.designation || "Not Assigned"}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-slate-500">Department</span>
+                                            <span className="col-span-2 font-medium text-slate-900">{viewUser.department || "Not Assigned"}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-slate-500">Joined On</span>
+                                            <span className="col-span-2 font-medium text-slate-900">{viewUser.date_of_joining || "N/A"}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-slate-500">Manager(s)</span>
+                                            <div className="col-span-2 flex flex-wrap gap-1">
+                                                {viewUser.reporting_managers?.length > 0 ? (
+                                                    viewUser.reporting_managers.map((m: string) => (
+                                                        <Badge key={m} variant="outline" className="text-xs font-normal">
+                                                            {m}
+                                                        </Badge>
+                                                    ))
+                                                ) : (
+                                                    <span className="text-slate-400 italic">None</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Personal & Account Details */}
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2 text-slate-900 font-semibold border-b pb-2">
+                                        <User className="h-4 w-4" />
+                                        <h4>Personal & Account</h4>
+                                    </div>
+                                    <div className="grid gap-4">
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-slate-500">Username</span>
+                                            <span className="col-span-2 font-medium text-slate-900">{viewUser.username}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-slate-500">Phone</span>
+                                            <span className="col-span-2 font-medium text-slate-900">{viewUser.details?.phone_number || "N/A"}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-slate-500">Personal Email</span>
+                                            <span className="col-span-2 font-medium text-slate-900 truncate" title={viewUser.details?.personal_email}>
+                                                {viewUser.details?.personal_email || "N/A"}
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-slate-500">User ID</span>
+                                            <span className="col-span-2 font-mono text-xs text-slate-500 bg-slate-50 p-1 rounded">
+                                                {viewUser.id}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={!!deleteUserId} onOpenChange={(open) => !open && setDeleteUserId(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete User</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete this user? This action cannot be undone and will remove all their data.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDeleteUserId(null)} disabled={isDeleting}>
+                            Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={handleDeleteUser} disabled={isDeleting}>
+                            {isDeleting ? "Deleting..." : "Delete User"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </AppShell>
+    );
+}
