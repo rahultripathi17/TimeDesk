@@ -14,3 +14,4 @@
 [2025-11-24 22:20:44 +0530] Add setup instructions for the backend mock server
 [2025-11-25 10:53:44 +0530] Update typography and implement custom Google Fonts
 [2025-11-28 19:28:02 +0530] Prepare v1.0 signed APK for distribution
+[2025-11-28 15:26:44 +0530] Fix bug where timer desyncs after app is minimized
