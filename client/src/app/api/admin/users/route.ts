@@ -1,6 +1,67 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
+export async function GET(request: Request) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const userId = searchParams.get('id');
+
+        if (!userId) {
+            return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+        }
+
+        const supabaseAdmin = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false
+                }
+            }
+        );
+
+        // 1. Get User from Auth (Source of Truth for Email)
+        const { data: { user }, error: authError } = await supabaseAdmin.auth.admin.getUserById(userId);
+
+        if (authError || !user) {
+            return NextResponse.json({ error: 'User not found in Auth' }, { status: 404 });
+        }
+
+        // 2. Get Profile Data
+        const { data: profile, error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+
+        if (profileError) {
+            console.error('Error fetching profile:', profileError);
+            // Continue even if profile is missing, but it shouldn't be
+        }
+
+        // 3. Get User Details
+        const { data: details, error: detailsError } = await supabaseAdmin
+            .from('user_details')
+            .select('*')
+            .eq('id', userId)
+            .single();
+
+        // Construct response
+        const userData = {
+            ...profile,
+            email: user.email, // Use email from Auth
+            details: details || {}
+        };
+
+        return NextResponse.json(userData);
+
+    } catch (error: any) {
+        console.error('Server Error:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+}
+
 export async function POST(request: Request) {
     try {
         const body = await request.json();

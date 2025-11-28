@@ -75,6 +75,7 @@ const adminExtra: NavItem[] = [
   { label: "Admin Home", href: "/admin", icon: LayoutDashboard, exact: true },
   { label: "Users & Roles", href: "/admin/users", icon: Users, exact: true },
   { label: "Add New User", href: "/admin/users/new", icon: UserPlus, exact: true },
+  { label: "Departments", href: "/admin/departments", icon: Users },
   { label: "Master Attendance", href: "/admin/attendance", icon: CalendarDays },
   { label: "Leave Limits", href: "/admin/leaves/limits", icon: ShieldCheck },
   { label: "Reports", href: "/admin/reports", icon: FileSpreadsheet },

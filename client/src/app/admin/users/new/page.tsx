@@ -92,12 +92,33 @@ function AddUserForm() {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
 
+    const [departmentsList, setDepartmentsList] = useState<string[]>([]);
+
     useEffect(() => {
         fetchManagers();
+        fetchDepartments();
         if (isEditMode && userId) {
             fetchUserData(userId);
         }
     }, [isEditMode, userId]);
+
+    const fetchDepartments = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('department_leave_limits')
+                .select('department');
+
+            if (error) throw error;
+
+            if (data) {
+                // Extract unique departments
+                const uniqueDepts = Array.from(new Set(data.map(item => item.department))).sort();
+                setDepartmentsList(uniqueDepts);
+            }
+        } catch (err) {
+            console.error("Error fetching departments:", err);
+        }
+    };
 
     const fetchManagers = async () => {
         try {
@@ -122,32 +143,23 @@ function AddUserForm() {
     const fetchUserData = async (id: string) => {
         setLoading(true);
         try {
-            const { data: profile, error: profileError } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', id)
-                .single();
-
-            if (profileError) throw profileError;
-
-            const { data: details, error: detailsError } = await supabase
-                .from('user_details')
-                .select('*')
-                .eq('id', id)
-                .single();
-
-            // It's possible details don't exist yet, so we don't throw on detailsError unless it's not 'PGRST116' (no rows)
+            const response = await fetch(`/api/admin/users?id=${id}`);
+            if (!response.ok) {
+                throw new Error('Failed to fetch user data');
+            }
+            const data = await response.json();
 
             // Populate State
-            setFullName(profile.full_name || "");
-            setEmail(profile.email || "");
-            setRole(profile.role || "");
-            setDesignation(profile.designation || "");
-            setDepartment(profile.department || "");
-            setDoj(profile.date_of_joining || "");
-            setSelectedManagers(profile.reporting_managers || []);
-            setProfilePic(profile.avatar_url || null);
+            setFullName(data.full_name || "");
+            setEmail(data.email || ""); // This now comes from Auth
+            setRole(data.role || "");
+            setDesignation(data.designation || "");
+            setDepartment(data.department || "");
+            setDoj(data.date_of_joining || "");
+            setSelectedManagers(data.reporting_managers || []);
+            setProfilePic(data.avatar_url || null);
 
+            const details = data.details;
             if (details) {
                 setPersonalEmail(details.personal_email || "");
                 setPhone(details.phone_number || "");
@@ -217,14 +229,15 @@ function AddUserForm() {
                 email,
                 personalEmail,
                 phone,
-                gender: gender === "Select gender" ? null : gender,
+                // Fix: Convert empty string to null for gender to satisfy check constraint
+                gender: gender && gender !== "Select gender" ? gender : null,
                 dob: dob ? dob.toISOString().split('T')[0] : null,
                 avatarUrl: profilePic,
 
                 // Address
                 address,
                 city,
-                state: state === "Select state" ? null : state,
+                state: state && state !== "Select state" ? state : null,
                 pincode,
 
                 // Identity
@@ -233,7 +246,7 @@ function AddUserForm() {
 
                 // Employment
                 dateOfJoining: doj,
-                department: department === "Select department" ? null : department,
+                department: department && department !== "Select department" ? department : null,
 
                 // Bank
                 bankName,
@@ -245,7 +258,8 @@ function AddUserForm() {
                 password: (document.getElementById('password') as HTMLInputElement).value, // Password is special, only send if changed
 
                 // Role
-                role: role === "select role" ? "employee" : role,
+                // Fix: Default to 'employee' if empty or invalid
+                role: role && role !== "select role" ? role : "employee",
                 designation,
                 reportingManagers: selectedManagers
             };
@@ -301,6 +315,47 @@ function AddUserForm() {
             setLoading(false);
         }
     };
+
+    if (success) {
+        return (
+            <AppShell role="admin">
+                <div className="mx-auto max-w-md px-4 py-6 sm:px-6 lg:py-8 mt-10">
+                    <Card>
+                        <CardContent className="pt-6 text-center space-y-4">
+                            <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                                <Check className="h-6 w-6 text-green-600" />
+                            </div>
+                            <h2 className="text-xl font-semibold text-slate-900">
+                                {isEditMode ? "User Updated Successfully!" : "User Added Successfully!"}
+                            </h2>
+                            <p className="text-sm text-slate-500">
+                                {isEditMode
+                                    ? "The user details have been updated."
+                                    : "The new user has been created and can now log in."}
+                            </p>
+                            <div className="flex flex-col gap-2 pt-4">
+                                <Button
+                                    className="w-full bg-blue-600 hover:bg-blue-700"
+                                    onClick={() => router.push('/admin/users')}
+                                >
+                                    Return to Users List
+                                </Button>
+                                {!isEditMode && (
+                                    <Button
+                                        variant="outline"
+                                        className="w-full"
+                                        onClick={() => window.location.reload()}
+                                    >
+                                        Add Another User
+                                    </Button>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            </AppShell>
+        );
+    }
 
     return (
         <AppShell role="admin">
@@ -367,13 +422,25 @@ function AddUserForm() {
                                         <Label htmlFor="personalEmail" className="text-xs font-medium">
                                             Personal Email
                                         </Label>
-                                        <Input id="personalEmail" type="email" placeholder="e.g. rahul.personal@gmail.com" />
+                                        <Input
+                                            id="personalEmail"
+                                            type="email"
+                                            placeholder="e.g. rahul.personal@gmail.com"
+                                            value={personalEmail}
+                                            onChange={(e) => setPersonalEmail(e.target.value)}
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="phone" className="text-xs font-medium">
                                             Phone Number
                                         </Label>
-                                        <Input id="phone" type="tel" placeholder="e.g. +91 9876543210" />
+                                        <Input
+                                            id="phone"
+                                            type="tel"
+                                            placeholder="e.g. +91 9876543210"
+                                            value={phone}
+                                            onChange={(e) => setPhone(e.target.value)}
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="gender" className="text-xs font-medium">
@@ -398,6 +465,7 @@ function AddUserForm() {
                                             id="dob"
                                             type="date"
                                             className="w-full"
+                                            value={dob ? dob.toISOString().split('T')[0] : ''}
                                             onChange={(e) => setDob(e.target.value ? new Date(e.target.value) : undefined)}
                                         />
                                     </div>
@@ -414,13 +482,23 @@ function AddUserForm() {
                                         <Label htmlFor="address" className="text-xs font-medium">
                                             Address
                                         </Label>
-                                        <Textarea id="address" placeholder="e.g. Flat No. 101, Galaxy Apartments" />
+                                        <Textarea
+                                            id="address"
+                                            placeholder="e.g. Flat No. 101, Galaxy Apartments"
+                                            value={address}
+                                            onChange={(e) => setAddress(e.target.value)}
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="city" className="text-xs font-medium">
                                             City
                                         </Label>
-                                        <Input id="city" placeholder="e.g. Mumbai" />
+                                        <Input
+                                            id="city"
+                                            placeholder="e.g. Mumbai"
+                                            value={city}
+                                            onChange={(e) => setCity(e.target.value)}
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="state" className="text-xs font-medium">
@@ -443,7 +521,13 @@ function AddUserForm() {
                                         <Label htmlFor="pincode" className="text-xs font-medium">
                                             Pincode
                                         </Label>
-                                        <Input id="pincode" placeholder="e.g. 400001" maxLength={6} />
+                                        <Input
+                                            id="pincode"
+                                            placeholder="e.g. 400001"
+                                            maxLength={6}
+                                            value={pincode}
+                                            onChange={(e) => setPincode(e.target.value)}
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -458,21 +542,34 @@ function AddUserForm() {
                                         <Label htmlFor="pan" className="text-xs font-medium">
                                             PAN Number
                                         </Label>
-                                        <Input id="pan" placeholder="e.g. ABCDE1234F" className="uppercase" maxLength={10} />
+                                        <Input
+                                            id="pan"
+                                            placeholder="e.g. ABCDE1234F"
+                                            className="uppercase"
+                                            maxLength={10}
+                                            value={pan}
+                                            onChange={(e) => setPan(e.target.value)}
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="aadhaar" className="text-xs font-medium">
                                             Aadhaar Number
                                         </Label>
-                                        <Input id="aadhaar" placeholder="e.g. 1234 5678 9012" maxLength={12} />
+                                        <Input
+                                            id="aadhaar"
+                                            placeholder="e.g. 1234 5678 9012"
+                                            maxLength={12}
+                                            value={aadhaar}
+                                            onChange={(e) => setAadhaar(e.target.value)}
+                                        />
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Employment Details */}
+                            {/* Employment & Role Details (Combined) */}
                             <div className="space-y-4">
                                 <h3 className="text-sm font-medium text-slate-900 border-b pb-2">
-                                    Employment Details
+                                    Employment & Role Details
                                 </h3>
                                 <div className="grid gap-4 md:grid-cols-2">
                                     <div className="space-y-2">
@@ -496,83 +593,21 @@ function AddUserForm() {
                                                 <SelectValue placeholder="Select department" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="engineering">Engineering</SelectItem>
-                                                <SelectItem value="marketing">Marketing</SelectItem>
-                                                <SelectItem value="sales">Sales</SelectItem>
-                                                <SelectItem value="hr">Human Resources</SelectItem>
-                                                <SelectItem value="finance">Finance</SelectItem>
-                                                <SelectItem value="operations">Operations</SelectItem>
-                                                <SelectItem value="product">Product</SelectItem>
-                                                <SelectItem value="design">Design</SelectItem>
+                                                {departmentsList.map((dept) => (
+                                                    <SelectItem key={dept} value={dept}>
+                                                        {dept}
+                                                    </SelectItem>
+                                                ))}
+                                                {/* Fallback if list is empty or to allow manual entry? For now, just list. */}
+                                                {departmentsList.length === 0 && (
+                                                    <SelectItem value="general" disabled>
+                                                        No departments found
+                                                    </SelectItem>
+                                                )}
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                </div>
-                            </div>
 
-                            {/* Bank Information */}
-                            <div className="space-y-4">
-                                <h3 className="text-sm font-medium text-slate-900 border-b pb-2">
-                                    Bank Information
-                                </h3>
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="bankName" className="text-xs font-medium">
-                                            Bank Name
-                                        </Label>
-                                        <Input id="bankName" placeholder="e.g. HDFC Bank" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="accountNumber" className="text-xs font-medium">
-                                            Account Number
-                                        </Label>
-                                        <Input id="accountNumber" placeholder="e.g. 1234567890" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="ifsc" className="text-xs font-medium">
-                                            IFSC Code
-                                        </Label>
-                                        <Input id="ifsc" placeholder="e.g. HDFC0001234" className="uppercase" maxLength={11} />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Account Information */}
-                            <div className="space-y-4">
-                                <h3 className="text-sm font-medium text-slate-900 border-b pb-2">
-                                    Account Information
-                                </h3>
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="email" className="text-xs font-medium">
-                                            Official Email (Username) <span className="text-red-500">*</span>
-                                        </Label>
-                                        <Input
-                                            id="email"
-                                            type="email"
-                                            placeholder="e.g. rahul@company.com"
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                        />
-                                        <p className="text-[10px] text-slate-500">
-                                            Use the official email address for login.
-                                        </p>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="password" className="text-xs font-medium">
-                                            Password <span className="text-red-500">*</span>
-                                        </Label>
-                                        <Input id="password" type="password" placeholder="••••••••" minLength={6} />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Role & Hierarchy */}
-                            <div className="space-y-4">
-                                <h3 className="text-sm font-medium text-slate-900 border-b pb-2">
-                                    Role & Hierarchy
-                                </h3>
-                                <div className="grid gap-4 md:grid-cols-2">
                                     <div className="space-y-2">
                                         <Label htmlFor="role" className="text-xs font-medium">
                                             Role <span className="text-red-500">*</span>
@@ -593,7 +628,12 @@ function AddUserForm() {
                                         <Label htmlFor="designation" className="text-xs font-medium">
                                             Designation
                                         </Label>
-                                        <Input id="designation" placeholder="e.g. Software Engineer" />
+                                        <Input
+                                            id="designation"
+                                            placeholder="e.g. Software Engineer"
+                                            value={designation}
+                                            onChange={(e) => setDesignation(e.target.value)}
+                                        />
                                     </div>
                                     <div className="space-y-2 md:col-span-2">
                                         <Label htmlFor="manager" className="text-xs font-medium">
@@ -672,20 +712,95 @@ function AddUserForm() {
                                 </div>
                             </div>
 
+                            {/* Bank Information */}
+                            <div className="space-y-4">
+                                <h3 className="text-sm font-medium text-slate-900 border-b pb-2">
+                                    Bank Information
+                                </h3>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="bankName" className="text-xs font-medium">
+                                            Bank Name
+                                        </Label>
+                                        <Input
+                                            id="bankName"
+                                            placeholder="e.g. HDFC Bank"
+                                            value={bankName}
+                                            onChange={(e) => setBankName(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="accountNumber" className="text-xs font-medium">
+                                            Account Number
+                                        </Label>
+                                        <Input
+                                            id="accountNumber"
+                                            placeholder="e.g. 1234567890"
+                                            value={accountNumber}
+                                            onChange={(e) => setAccountNumber(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="ifsc" className="text-xs font-medium">
+                                            IFSC Code
+                                        </Label>
+                                        <Input
+                                            id="ifsc"
+                                            placeholder="e.g. HDFC0001234"
+                                            className="uppercase"
+                                            maxLength={11}
+                                            value={ifsc}
+                                            onChange={(e) => setIfsc(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Account Information */}
+                            <div className="space-y-4">
+                                <h3 className="text-sm font-medium text-slate-900 border-b pb-2">
+                                    Account Information
+                                </h3>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="email" className="text-xs font-medium">
+                                            Official Email (Username) <span className="text-red-500">*</span>
+                                        </Label>
+                                        <Input
+                                            id="email"
+                                            type="email"
+                                            placeholder="e.g. rahul@company.com"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                        />
+                                        <p className="text-[10px] text-slate-500">
+                                            Use the official email address for login.
+                                        </p>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="password" className="text-xs font-medium">
+                                            Password <span className="text-red-500">*</span>
+                                        </Label>
+                                        <Input id="password" type="password" placeholder="••••••••" minLength={6} />
+                                    </div>
+                                </div>
+                            </div>
+
                             {error && (
                                 <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm">
                                     {error}
                                 </div>
                             )}
 
-                            {success && (
-                                <div className="bg-green-50 text-green-600 p-3 rounded-md text-sm">
-                                    User created successfully!
-                                </div>
-                            )}
-
                             <div className="flex justify-end gap-3 pt-4">
-                                <Button variant="outline" type="button" disabled={loading}>Cancel</Button>
+                                <Button
+                                    variant="outline"
+                                    type="button"
+                                    disabled={loading}
+                                    onClick={() => router.push('/admin/users')}
+                                >
+                                    Cancel
+                                </Button>
                                 <Button className="bg-blue-600 hover:bg-blue-700" type="submit" disabled={loading}>
                                     {loading ? (isEditMode ? "Updating..." : "Adding...") : (isEditMode ? "Update User" : "Add User")}
                                 </Button>
