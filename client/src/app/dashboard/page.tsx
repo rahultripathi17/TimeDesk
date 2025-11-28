@@ -9,7 +9,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CalendarDays, Clock, Home, MapPin, Globe, Palmtree, AlertCircle, CheckCircle2 } from "lucide-react";
+import { CalendarDays, Clock, Home, MapPin, Globe, Palmtree, AlertCircle, CheckCircle2, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { format, isToday } from "date-fns";
@@ -23,9 +23,11 @@ export default function EmployeeDashboardPage() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchedDate, setFetchedDate] = useState<string | null>(null);
+  const [commonInfo, setCommonInfo] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTodayStatus();
+    fetchCommonInfo();
 
     // Poll for status updates every minute
     const interval = setInterval(() => {
@@ -49,6 +51,22 @@ export default function EmployeeDashboardPage() {
       window.removeEventListener('focus', handleFocus);
     };
   }, [fetchedDate]);
+
+  const fetchCommonInfo = async () => {
+    try {
+      const { data } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'common_info')
+        .maybeSingle();
+
+      if (data) {
+        setCommonInfo(data.value);
+      }
+    } catch (error) {
+      console.error("Error fetching common info:", error);
+    }
+  };
 
   const handleStatusSelect = (newStatus: "available" | "remote") => {
     setSelectedStatus(newStatus);
@@ -338,6 +356,26 @@ export default function EmployeeDashboardPage() {
             </CardContent>
           </Card>
         </section>
+
+        {commonInfo && (
+          <div className="mt-6">
+            <Card className="overflow-hidden border-l-4 border-l-indigo-500 shadow-sm transition-all hover:shadow-md">
+              <CardHeader className="bg-slate-50/50 pb-3 pt-4">
+                <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
+                    <Info className="h-3.5 w-3.5" />
+                  </div>
+                  Notice Board
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="prose prose-sm max-w-none text-slate-600">
+                  <p className="whitespace-pre-wrap leading-relaxed">{commonInfo}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </AppShell>
   );

@@ -93,6 +93,7 @@ const adminExtra: NavItem[] = [
     ],
   },
   { label: "Reports", href: "/admin/reports", icon: FileSpreadsheet },
+  { label: "Notice Board", href: "/admin/settings", icon: Settings },
 ];
 export function navForRole(role: Role): NavItem[] {
   switch (role) {
@@ -302,7 +303,7 @@ export function DesktopSidebar({ role }: { role: Role }) {
               {role === "hr" ? "HR" : role} panel
             </span>
             <Link
-              href="/settings"
+              href={role === "admin" ? "/admin/settings" : "/settings"}
               className={cn(
                 "flex items-center gap-1 rounded-md p-1.5 text-[11px] hover:bg-slate-100",
                 !isExpanded && "justify-center"
