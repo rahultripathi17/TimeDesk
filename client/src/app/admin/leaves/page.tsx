@@ -12,11 +12,19 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { Check, X, Calendar } from "lucide-react";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Check, X, Calendar, Clock, History, Info } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { format, differenceInDays, parseISO } from "date-fns";
 
 export default function LeaveApprovalPage() {
     const [leaves, setLeaves] = useState<any[]>([]);
@@ -24,15 +32,15 @@ export default function LeaveApprovalPage() {
     const [processingId, setProcessingId] = useState<string | null>(null);
 
     useEffect(() => {
-        fetchPendingLeaves();
+        fetchLeaves();
     }, []);
 
-    const fetchPendingLeaves = async () => {
+    const fetchLeaves = async () => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            // Fetch leaves where approver_id is current user and status is pending
+            // Fetch ALL leaves where approver_id is current user
             const { data, error } = await supabase
                 .from('leaves')
                 .select(`
@@ -40,8 +48,7 @@ export default function LeaveApprovalPage() {
                     profiles:user_id (full_name, email, avatar_url)
                 `)
                 .eq('approver_id', user.id)
-                .eq('status', 'pending')
-                .order('created_at', { ascending: true });
+                .order('created_at', { ascending: false });
 
             if (error) throw error;
             setLeaves(data || []);
@@ -52,19 +59,45 @@ export default function LeaveApprovalPage() {
         }
     };
 
+    const pendingLeaves = leaves.filter(l => l.status === 'pending');
+    const historyLeaves = leaves.filter(l => l.status !== 'pending');
+
+    const getDuration = (start: string, end: string) => {
+        const startDate = parseISO(start);
+        const endDate = parseISO(end);
+        const days = differenceInDays(endDate, startDate) + 1;
+        return `${days} Day${days > 1 ? 's' : ''}`;
+    };
+
     const handleAction = async (id: string, status: 'approved' | 'rejected') => {
         setProcessingId(id);
         try {
-            const { error } = await supabase
-                .from('leaves')
-                .update({ status })
-                .eq('id', id);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Not authenticated");
 
-            if (error) throw error;
+            const response = await fetch('/api/leaves/approve', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    leaveId: id,
+                    status,
+                    approverId: user.id
+                }),
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to update status');
+            }
 
             toast.success(`Leave request ${status} successfully`);
-            // Remove from list
-            setLeaves(leaves.filter(l => l.id !== id));
+
+            // Update local state
+            setLeaves(leaves.map(l =>
+                l.id === id ? { ...l, status } : l
+            ));
 
         } catch (error: any) {
             console.error(`Error ${status} leave:`, error);
@@ -84,96 +117,208 @@ export default function LeaveApprovalPage() {
                     </p>
                 </header>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Pending Approvals</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Employee</TableHead>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>Dates</TableHead>
-                                    <TableHead>Reason</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {loading ? (
-                                    <TableRow>
-                                        <TableCell colSpan={5} className="h-24 text-center">
-                                            Loading...
-                                        </TableCell>
-                                    </TableRow>
-                                ) : leaves.length > 0 ? (
-                                    leaves.map((leave) => (
-                                        <TableRow key={leave.id}>
-                                            <TableCell>
-                                                <div className="flex flex-col">
-                                                    <span className="font-medium text-sm text-slate-900">
-                                                        {leave.profiles?.full_name || "Unknown User"}
-                                                    </span>
-                                                    <span className="text-xs text-slate-500">
-                                                        {leave.profiles?.email}
-                                                    </span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline" className="font-normal">
-                                                    {leave.type}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col text-xs">
-                                                    <span>{leave.start_date}</span>
-                                                    <span className="text-slate-400">to</span>
-                                                    <span>{leave.end_date}</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="max-w-[250px] text-xs text-slate-600">
-                                                {leave.reason}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                                                        onClick={() => handleAction(leave.id, 'rejected')}
-                                                        disabled={processingId === leave.id}
-                                                    >
-                                                        <X className="h-4 w-4" />
-                                                        <span className="sr-only">Reject</span>
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
-                                                        onClick={() => handleAction(leave.id, 'approved')}
-                                                        disabled={processingId === leave.id}
-                                                    >
-                                                        <Check className="h-4 w-4" />
-                                                        <span className="sr-only">Approve</span>
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
+                <Tabs defaultValue="pending" className="w-full">
+                    <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+                        <TabsTrigger value="pending">Pending Requests</TabsTrigger>
+                        <TabsTrigger value="history">History</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="pending">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-base flex items-center gap-2">
+                                    <Clock className="h-4 w-4 text-amber-500" />
+                                    Pending Approvals
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Employee</TableHead>
+                                            <TableHead>Type</TableHead>
+                                            <TableHead>Duration</TableHead>
+                                            <TableHead>Dates</TableHead>
+                                            <TableHead>Reason</TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell colSpan={5} className="h-24 text-center text-slate-500">
-                                            <div className="flex flex-col items-center gap-2">
-                                                <Check className="h-8 w-8 text-green-500 bg-green-50 rounded-full p-1" />
-                                                <p>All caught up! No pending requests.</p>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {loading ? (
+                                            <TableRow>
+                                                <TableCell colSpan={6} className="h-24 text-center">
+                                                    Loading...
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : pendingLeaves.length > 0 ? (
+                                            pendingLeaves.map((leave) => (
+                                                <TableRow key={leave.id}>
+                                                    <TableCell>
+                                                        <div className="flex flex-col">
+                                                            <span className="font-medium text-sm text-slate-900">
+                                                                {leave.profiles?.full_name || "Unknown User"}
+                                                            </span>
+                                                            <span className="text-xs text-slate-500">
+                                                                {leave.profiles?.email}
+                                                            </span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="outline" className="font-normal">
+                                                            {leave.type}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="font-medium text-sm text-slate-700">
+                                                            {getDuration(leave.start_date, leave.end_date)}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex flex-col text-xs text-slate-500">
+                                                            <span>{format(parseISO(leave.start_date), "MMM d, yyyy")}</span>
+                                                            <span className="text-slate-300 text-[10px]">to</span>
+                                                            <span>{format(parseISO(leave.end_date), "MMM d, yyyy")}</span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="max-w-[200px] text-xs text-slate-600 truncate" title={leave.reason}>
+                                                        {leave.reason}
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <div className="flex justify-end gap-2">
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                                                                onClick={() => handleAction(leave.id, 'rejected')}
+                                                                disabled={processingId === leave.id}
+                                                            >
+                                                                <X className="h-4 w-4" />
+                                                                <span className="sr-only">Reject</span>
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
+                                                                onClick={() => handleAction(leave.id, 'approved')}
+                                                                disabled={processingId === leave.id}
+                                                            >
+                                                                <Check className="h-4 w-4" />
+                                                                <span className="sr-only">Approve</span>
+                                                            </Button>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={6} className="h-32 text-center text-slate-500">
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <Check className="h-8 w-8 text-green-500 bg-green-50 rounded-full p-1" />
+                                                        <p>All caught up! No pending requests.</p>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    <TabsContent value="history">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-base flex items-center gap-2">
+                                    <History className="h-4 w-4 text-slate-500" />
+                                    Approval History
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Employee</TableHead>
+                                            <TableHead>Type</TableHead>
+                                            <TableHead>Duration</TableHead>
+                                            <TableHead>Dates</TableHead>
+                                            <TableHead>Status</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {loading ? (
+                                            <TableRow>
+                                                <TableCell colSpan={5} className="h-24 text-center">
+                                                    Loading...
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : historyLeaves.length > 0 ? (
+                                            historyLeaves.map((leave) => (
+                                                <TableRow key={leave.id}>
+                                                    <TableCell>
+                                                        <div className="flex flex-col">
+                                                            <span className="font-medium text-sm text-slate-900">
+                                                                {leave.profiles?.full_name || "Unknown User"}
+                                                            </span>
+                                                            <span className="text-xs text-slate-500">
+                                                                {leave.profiles?.email}
+                                                            </span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="outline" className="font-normal">
+                                                            {leave.type}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="font-medium text-sm text-slate-700">
+                                                            {getDuration(leave.start_date, leave.end_date)}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex flex-col text-xs text-slate-500">
+                                                            <span>{format(parseISO(leave.start_date), "MMM d, yyyy")}</span>
+                                                            <span className="text-slate-300 text-[10px]">to</span>
+                                                            <span>{format(parseISO(leave.end_date), "MMM d, yyyy")}</span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-2">
+                                                            <Badge
+                                                                variant="secondary"
+                                                                className={cn(
+                                                                    "capitalize font-medium",
+                                                                    leave.status === 'approved' ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                                                                )}
+                                                            >
+                                                                {leave.status}
+                                                            </Badge>
+                                                            <TooltipProvider>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <Info className="h-4 w-4 text-slate-400 cursor-help" />
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent>
+                                                                        <p>Action taken by you</p>
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                            </TooltipProvider>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={5} className="h-24 text-center text-slate-500">
+                                                    No history found.
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
             </div>
         </AppShell>
     );

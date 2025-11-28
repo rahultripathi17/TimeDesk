@@ -15,22 +15,18 @@ import {
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Loader2, Save, Plus, Trash2 } from "lucide-react";
-
-const DEPARTMENTS = [
-    "Engineering",
-    "Product",
-    "Human Resources",
-    "Sales",
-    "Marketing",
-    "Finance",
-    "Operations",
-    "Design",
-    "Tech",
-];
+import { supabase } from "@/utils/supabase/client";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 type LeaveLimit = {
     leave_type: string;
     limit_days: number;
+    color: string;
 };
 
 export default function LeaveLimitsPage() {
@@ -38,10 +34,35 @@ export default function LeaveLimitsPage() {
     const [limits, setLimits] = useState<LeaveLimit[]>([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [departmentsList, setDepartmentsList] = useState<string[]>([]);
 
     // New leave type state
     const [newType, setNewType] = useState("");
     const [newLimit, setNewLimit] = useState("");
+    const [newColor, setNewColor] = useState("#14b8a6"); // Default Teal
+
+    useEffect(() => {
+        fetchDepartments();
+    }, []);
+
+    const fetchDepartments = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('department_leave_limits')
+                .select('department');
+
+            if (error) throw error;
+
+            if (data) {
+                // Extract unique departments
+                const uniqueDepts = Array.from(new Set(data.map(item => item.department))).sort();
+                setDepartmentsList(uniqueDepts);
+            }
+        } catch (err) {
+            console.error("Error fetching departments:", err);
+            toast.error("Failed to load departments");
+        }
+    };
 
     useEffect(() => {
         if (department) {
@@ -62,15 +83,16 @@ export default function LeaveLimitsPage() {
                 // Map response to state
                 const fetchedLimits = data.map((item: any) => ({
                     leave_type: item.leave_type,
-                    limit_days: item.limit_days
+                    limit_days: item.limit_days,
+                    color: item.color || "#14b8a6"
                 }));
                 setLimits(fetchedLimits);
             } else {
                 // Default types if none exist
                 setLimits([
-                    { leave_type: "Sick", limit_days: 0 },
-                    { leave_type: "Casual", limit_days: 0 },
-                    { leave_type: "Privilege", limit_days: 0 },
+                    { leave_type: "Sick", limit_days: 0, color: "#f97316" }, // Orange
+                    { leave_type: "Casual", limit_days: 0, color: "#f59e0b" }, // Amber
+                    { leave_type: "Privilege", limit_days: 0, color: "#a855f7" }, // Purple
                 ]);
             }
         } catch (error) {
@@ -81,9 +103,13 @@ export default function LeaveLimitsPage() {
         }
     };
 
-    const handleLimitChange = (index: number, value: string) => {
+    const handleLimitChange = (index: number, field: keyof LeaveLimit, value: any) => {
         const newLimits = [...limits];
-        newLimits[index].limit_days = parseInt(value) || 0;
+        if (field === 'limit_days') {
+            newLimits[index].limit_days = parseInt(value) || 0;
+        } else if (field === 'color') {
+            newLimits[index].color = value;
+        }
         setLimits(newLimits);
     };
 
@@ -97,9 +123,14 @@ export default function LeaveLimitsPage() {
             return;
         }
 
-        setLimits([...limits, { leave_type: newType.trim(), limit_days: parseInt(newLimit) || 0 }]);
+        setLimits([...limits, {
+            leave_type: newType.trim(),
+            limit_days: parseInt(newLimit) || 0,
+            color: newColor
+        }]);
         setNewType("");
         setNewLimit("");
+        setNewColor("#14b8a6");
     };
 
     const handleRemoveType = (index: number) => {
@@ -135,6 +166,62 @@ export default function LeaveLimitsPage() {
         }
     };
 
+    const PRESET_COLORS = [
+        "#f97316", // Orange
+        "#f59e0b", // Amber
+        "#14b8a6", // Teal
+        "#6366f1", // Indigo
+        "#a855f7", // Purple
+        "#ec4899", // Pink
+        "#64748b", // Slate
+        "#8b5cf6", // Violet
+        "#d946ef", // Fuchsia
+        "#06b6d4", // Cyan
+    ];
+
+    const ColorPicker = ({ value, onChange }: { value: string, onChange: (color: string) => void }) => {
+        const [open, setOpen] = useState(false);
+
+        return (
+            <Popover open={open} onOpenChange={setOpen}>
+                <PopoverTrigger asChild>
+                    <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={open}
+                        className="w-full justify-start gap-2 px-3 font-normal"
+                    >
+                        <div
+                            className="h-4 w-4 rounded-full border border-slate-200"
+                            style={{ backgroundColor: value }}
+                        />
+                        <span className="text-slate-500">
+                            {value ? "Selected Color" : "Pick a color"}
+                        </span>
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-3">
+                    <div className="grid grid-cols-5 gap-2">
+                        {PRESET_COLORS.map((color) => (
+                            <button
+                                key={color}
+                                className={cn(
+                                    "h-8 w-8 rounded-full border-2 transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2",
+                                    value === color ? "border-slate-900 scale-110" : "border-transparent"
+                                )}
+                                style={{ backgroundColor: color }}
+                                onClick={() => {
+                                    onChange(color);
+                                    setOpen(false);
+                                }}
+                            />
+                        ))}
+                    </div>
+                </PopoverContent>
+            </Popover>
+        );
+    };
+
     return (
         <AppShell role="admin">
             <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:py-8">
@@ -160,11 +247,16 @@ export default function LeaveLimitsPage() {
                                     <SelectValue placeholder="Select Department" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {DEPARTMENTS.map((dept) => (
+                                    {departmentsList.map((dept) => (
                                         <SelectItem key={dept} value={dept}>
                                             {dept}
                                         </SelectItem>
                                     ))}
+                                    {departmentsList.length === 0 && (
+                                        <SelectItem value="no-depts" disabled>
+                                            No departments found
+                                        </SelectItem>
+                                    )}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -179,29 +271,36 @@ export default function LeaveLimitsPage() {
                                     <>
                                         <div className="space-y-4">
                                             <div className="grid grid-cols-12 gap-4 font-medium text-sm text-slate-500 mb-2">
-                                                <div className="col-span-6">Leave Type</div>
-                                                <div className="col-span-4">Annual Limit (Days)</div>
-                                                <div className="col-span-2"></div>
+                                                <div className="col-span-4">Leave Type</div>
+                                                <div className="col-span-3">Annual Limit (Days)</div>
+                                                <div className="col-span-4">Color Label</div>
+                                                <div className="col-span-1"></div>
                                             </div>
 
                                             {limits.map((limit, index) => (
                                                 <div key={index} className="grid grid-cols-12 gap-4 items-center">
-                                                    <div className="col-span-6">
+                                                    <div className="col-span-4">
                                                         <Input
                                                             value={limit.leave_type}
                                                             readOnly
                                                             className="bg-slate-50"
                                                         />
                                                     </div>
-                                                    <div className="col-span-4">
+                                                    <div className="col-span-3">
                                                         <Input
                                                             type="number"
                                                             min="0"
                                                             value={limit.limit_days}
-                                                            onChange={(e) => handleLimitChange(index, e.target.value)}
+                                                            onChange={(e) => handleLimitChange(index, 'limit_days', e.target.value)}
                                                         />
                                                     </div>
-                                                    <div className="col-span-2 flex justify-end">
+                                                    <div className="col-span-4">
+                                                        <ColorPicker
+                                                            value={limit.color}
+                                                            onChange={(color) => handleLimitChange(index, 'color', color)}
+                                                        />
+                                                    </div>
+                                                    <div className="col-span-1 flex justify-end">
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
@@ -216,14 +315,14 @@ export default function LeaveLimitsPage() {
 
                                             {/* Add New Type Row */}
                                             <div className="grid grid-cols-12 gap-4 items-center pt-4 border-t border-dashed">
-                                                <div className="col-span-6">
+                                                <div className="col-span-4">
                                                     <Input
-                                                        placeholder="New Leave Type (e.g. Bereavement)"
+                                                        placeholder="New Leave Type"
                                                         value={newType}
                                                         onChange={(e) => setNewType(e.target.value)}
                                                     />
                                                 </div>
-                                                <div className="col-span-4">
+                                                <div className="col-span-3">
                                                     <Input
                                                         type="number"
                                                         min="0"
@@ -232,14 +331,20 @@ export default function LeaveLimitsPage() {
                                                         onChange={(e) => setNewLimit(e.target.value)}
                                                     />
                                                 </div>
-                                                <div className="col-span-2 flex justify-end">
+                                                <div className="col-span-4">
+                                                    <ColorPicker
+                                                        value={newColor}
+                                                        onChange={setNewColor}
+                                                    />
+                                                </div>
+                                                <div className="col-span-1 flex justify-end">
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
                                                         onClick={handleAddType}
                                                         className="w-full"
                                                     >
-                                                        <Plus className="h-4 w-4 mr-1" /> Add
+                                                        <Plus className="h-4 w-4" />
                                                     </Button>
                                                 </div>
                                             </div>

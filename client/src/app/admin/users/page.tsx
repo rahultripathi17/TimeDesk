@@ -43,23 +43,14 @@ import {
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/utils/supabase/client";
-
-const DEPARTMENTS = [
-    "Engineering",
-    "Product",
-    "Human Resources",
-    "Sales",
-    "Marketing",
-    "Finance",
-    "Operations",
-    "Design",
-];
+import { format } from "date-fns";
 
 export default function UsersListPage() {
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [departmentFilter, setDepartmentFilter] = useState("all");
+    const [departmentsList, setDepartmentsList] = useState<string[]>([]);
 
     // Action States
     const [viewUser, setViewUser] = useState<any | null>(null);
@@ -68,7 +59,26 @@ export default function UsersListPage() {
 
     useEffect(() => {
         fetchUsers();
+        fetchDepartments();
     }, []);
+
+    const fetchDepartments = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('department_leave_limits')
+                .select('department');
+
+            if (error) throw error;
+
+            if (data) {
+                // Extract unique departments
+                const uniqueDepts = Array.from(new Set(data.map(item => item.department))).sort();
+                setDepartmentsList(uniqueDepts);
+            }
+        } catch (err) {
+            console.error("Error fetching departments:", err);
+        }
+    };
 
     const fetchUsers = async () => {
         try {
@@ -79,19 +89,45 @@ export default function UsersListPage() {
                     *,
                     user_details (*),
                     attendance (
-                        status
+                        status,
+                        date
+                    ),
+                    leaves!user_id (
+                        status,
+                        start_date,
+                        end_date
                     )
                 `);
 
             if (error) throw error;
 
             // Process data to include today's status
-            const today = new Date().toISOString().split('T')[0];
+            const today = format(new Date(), 'yyyy-MM-dd');
+
             const processedUsers = data.map((user: any) => {
+                // 1. Check Attendance
                 const todayAttendance = user.attendance?.find((a: any) => a.date === today);
+
+                let status = 'absent';
+
+                if (todayAttendance) {
+                    status = todayAttendance.status;
+                } else {
+                    // 2. Check Leaves
+                    const activeLeave = user.leaves?.find((l: any) =>
+                        l.status === 'approved' &&
+                        l.start_date <= today &&
+                        l.end_date >= today
+                    );
+
+                    if (activeLeave) {
+                        status = 'leave';
+                    }
+                }
+
                 return {
                     ...user,
-                    status: todayAttendance?.status || 'absent', // Default to absent if no record
+                    status: status,
                     initials: getInitials(user.full_name),
                     details: user.user_details // Store details
                 };
@@ -258,7 +294,7 @@ export default function UsersListPage() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">All Departments</SelectItem>
-                                    {DEPARTMENTS.map((dept) => (
+                                    {departmentsList.map((dept) => (
                                         <SelectItem key={dept} value={dept}>
                                             {dept}
                                         </SelectItem>

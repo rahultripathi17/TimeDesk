@@ -15,37 +15,38 @@ import {
   isBefore,
   getDay,
   eachDayOfInterval,
+  parseISO,
 } from "date-fns";
-import { cn } from "@/lib/utils"; // shadcn helper
+import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
+import { supabase } from "@/utils/supabase/client";
 
 // ------------ Types ------------
 
 type AttendanceStatus =
   | "OFFICE" // Present
   | "REMOTE" // Remote / WFH
-  | "PL" // Privilege Leave
-  | "CL" // Casual Leave
-  | "SL" // Sick Leave
-  | "BL" // Bereavement Leave
-  | "ABSENT";
+  | "ABSENT"
+  | string; // Dynamic leave types
 
 type AttendanceRecord = {
   date: string; // '2025-11-03'
   status: AttendanceStatus;
+  color?: string; // Dynamic color
+  label?: string; // Dynamic label
 };
 
 type StatusStyle = {
-  label: string; // full text for inside the cell
-  short: string; // small code for legend
+  label: string;
+  short: string;
   bg: string;
   text: string;
   border: string;
 };
 
-// ------------ Styles per status ------------
+// ------------ Default Styles ------------
 
-const statusStyles: Record<AttendanceStatus, StatusStyle> = {
+const defaultStyles: Record<string, StatusStyle> = {
   OFFICE: {
     label: "Present",
     short: "P",
@@ -60,34 +61,6 @@ const statusStyles: Record<AttendanceStatus, StatusStyle> = {
     text: "text-blue-800",
     border: "border-blue-300",
   },
-  PL: {
-    label: "Privilege Leave",
-    short: "PL",
-    bg: "bg-orange-100",
-    text: "text-orange-800",
-    border: "border-orange-300",
-  },
-  CL: {
-    label: "Casual Leave",
-    short: "CL",
-    bg: "bg-orange-100",
-    text: "text-orange-800",
-    border: "border-orange-300",
-  },
-  SL: {
-    label: "Sick Leave",
-    short: "SL",
-    bg: "bg-orange-100",
-    text: "text-orange-800",
-    border: "border-orange-300",
-  },
-  BL: {
-    label: "Bereavement Leave",
-    short: "BL",
-    bg: "bg-orange-100",
-    text: "text-orange-800",
-    border: "border-orange-300",
-  },
   ABSENT: {
     label: "Absent",
     short: "A",
@@ -97,45 +70,124 @@ const statusStyles: Record<AttendanceStatus, StatusStyle> = {
   },
 };
 
-// ------------ Mock data (replace with API later) ------------
-
-const mockRecordsForMonth = (month: Date): AttendanceRecord[] => {
-  const monthStr = format(month, "yyyy-MM");
-  return [
-    { date: `${monthStr}-03`, status: "CL" },
-    { date: `${monthStr}-04`, status: "OFFICE" },
-    { date: `${monthStr}-05`, status: "OFFICE" },
-    { date: `${monthStr}-06`, status: "OFFICE" },
-    { date: `${monthStr}-07`, status: "OFFICE" },
-    { date: `${monthStr}-10`, status: "OFFICE" },
-    { date: `${monthStr}-13`, status: "PL" },
-    { date: `${monthStr}-17`, status: "OFFICE" },
-    { date: `${monthStr}-20`, status: "SL" },
-    { date: `${monthStr}-21`, status: "OFFICE" },
-    { date: `${monthStr}-22`, status: "BL" },
-    { date: `${monthStr}-24`, status: "ABSENT" },
-    { date: `${monthStr}-26`, status: "REMOTE" },
-  ];
+type LeaveType = {
+  leave_type: string;
+  color: string;
 };
-
-function getRecordForDate(records: AttendanceRecord[], date: Date) {
-  const iso = format(date, "yyyy-MM-dd");
-  return records.find((r) => r.date === iso);
-}
-
-// ------------ Component ------------
 
 export function AttendanceCalendar({ employeeId }: { employeeId: string }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // today (date-only)
   const today = startOfDay(new Date());
 
+  const fetchLeaveTypes = async () => {
+    try {
+      const { data } = await supabase.from('department_leave_limits').select('leave_type, color');
+      if (data) {
+        // Deduplicate by leave_type
+        const uniqueTypes = Array.from(new Map(data.map(item => [item.leave_type, item])).values());
+        setLeaveTypes(uniqueTypes);
+      }
+    } catch (error) {
+      console.error("Error fetching leave types:", error);
+    }
+  };
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const monthStartStr = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
+      const monthEndStr = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
+
+      // 1. Fetch Attendance
+      const { data: attendanceData } = await supabase
+        .from('attendance')
+        .select('date, status')
+        .eq('user_id', user.id)
+        .gte('date', monthStartStr)
+        .lte('date', monthEndStr);
+
+      // 2. Fetch Leaves (Approved)
+      // We want leaves that overlap with the current month:
+      // start_date <= monthEnd AND end_date >= monthStart
+      const { data: leavesData } = await supabase
+        .from('leaves')
+        .select('start_date, end_date, type, status')
+        .eq('user_id', user.id)
+        .eq('status', 'approved')
+        .lte('start_date', monthEndStr)
+        .gte('end_date', monthStartStr);
+
+      // Process records
+      const processedRecords: AttendanceRecord[] = [];
+
+      // Map attendance
+      attendanceData?.forEach((att) => {
+        let status = att.status.toUpperCase();
+        if (status === 'AVAILABLE') status = 'OFFICE';
+
+        // If status is LEAVE, we'll handle it with leavesData to get specific type
+        if (status !== 'LEAVE') {
+          processedRecords.push({
+            date: att.date,
+            status: status
+          });
+        }
+      });
+
+      // Map leaves (overwrite attendance if exists, or add new)
+      leavesData?.forEach((leave) => {
+        const leaveStart = parseISO(leave.start_date);
+        const leaveEnd = parseISO(leave.end_date);
+
+        // Iterate through each day of the leave
+        for (let d = new Date(leaveStart); d <= leaveEnd; d.setDate(d.getDate() + 1)) {
+          const dateStr = format(d, 'yyyy-MM-dd');
+
+          // Only if within current month view
+          if (dateStr >= monthStartStr && dateStr <= monthEndStr) {
+            // Find leave type color (Case Insensitive Match)
+            const leaveTypeInfo = leaveTypes.find(lt =>
+              lt.leave_type.trim().toLowerCase() === leave.type.trim().toLowerCase()
+            );
+
+            // Remove existing record for this date if any (priority to leave details)
+            const existingIndex = processedRecords.findIndex(r => r.date === dateStr);
+            if (existingIndex !== -1) processedRecords.splice(existingIndex, 1);
+
+            processedRecords.push({
+              date: dateStr,
+              status: leave.type,
+              color: leaveTypeInfo?.color || '#f59e0b', // Fallback color (amber-500)
+              label: leave.type
+            });
+          }
+        }
+      });
+
+      setRecords(processedRecords);
+
+    } catch (error) {
+      console.error("Error fetching calendar data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // later: fetch from API with employeeId + month
-    setRecords(mockRecordsForMonth(currentMonth));
-  }, [currentMonth, employeeId]);
+    fetchLeaveTypes();
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [currentMonth, leaveTypes]); // Re-fetch if leaveTypes changes (to apply colors)
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -152,13 +204,14 @@ export function AttendanceCalendar({ employeeId }: { employeeId: string }) {
     const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
     daysInMonth.forEach((day) => {
-      const rec = getRecordForDate(records, day);
-      
+      const dateStr = format(day, 'yyyy-MM-dd');
+      const rec = records.find(r => r.date === dateStr);
+
       if (rec) {
         if (rec.status === "OFFICE") present++;
         else if (rec.status === "REMOTE") wfh++;
-        else if (["PL", "CL", "SL", "BL"].includes(rec.status)) leave++;
         else if (rec.status === "ABSENT") absent++;
+        else leave++; // Any other status is considered leave
       } else {
         // Auto-ABSENT logic
         if (isBefore(day, today) && getDay(day) !== 0) {
@@ -170,6 +223,22 @@ export function AttendanceCalendar({ employeeId }: { employeeId: string }) {
     return { present, wfh, leave, absent };
   }, [records, monthStart, monthEnd, today]);
 
+  const getStyle = (status: string, color?: string): StatusStyle | undefined => {
+    if (defaultStyles[status]) return defaultStyles[status];
+
+    // Dynamic leave style
+    if (color) {
+      return {
+        label: status,
+        short: status.substring(0, 2).toUpperCase(),
+        bg: '', // We'll use inline style for dynamic colors
+        text: 'text-white',
+        border: ''
+      };
+    }
+    return undefined;
+  };
+
   const rows: JSX.Element[] = [];
   let day = gridStart;
 
@@ -178,16 +247,26 @@ export function AttendanceCalendar({ employeeId }: { employeeId: string }) {
 
     for (let i = 0; i < 7; i++) {
       const inMonth = isSameMonth(day, monthStart);
-      const rec = getRecordForDate(records, day);
-      const explicitStyle = rec ? statusStyles[rec.status] : undefined;
+      const dateStr = format(day, 'yyyy-MM-dd');
+      const rec = records.find(r => r.date === dateStr);
+
+      const style = rec ? getStyle(rec.status, rec.color) : undefined;
       const isToday = isSameDay(day, today);
 
       // 🔸 Auto-ABSENT logic:
-      // If no record, day is in this month, is before today, and not Sunday → Absent
-      let effectiveStyle = explicitStyle;
-      if (!explicitStyle && inMonth && isBefore(day, today) && getDay(day) !== 0) {
-        effectiveStyle = statusStyles.ABSENT;
+      let effectiveStyle = style;
+      let isAbsent = false;
+      if (!style && inMonth && isBefore(day, today) && getDay(day) !== 0) {
+        effectiveStyle = defaultStyles.ABSENT;
+        isAbsent = true;
       }
+
+      // Dynamic color handling
+      const dynamicStyle = rec?.color ? {
+        backgroundColor: rec.color,
+        borderColor: rec.color,
+        color: '#fff'
+      } : {};
 
       days.push(
         <div
@@ -195,10 +274,11 @@ export function AttendanceCalendar({ employeeId }: { employeeId: string }) {
           className={cn(
             "flex min-h-[60px] sm:min-h-[72px] lg:min-h-[82px] w-full flex-col border border-slate-100 p-1.5 sm:p-2 text-left text-[10px] sm:text-xs transition-colors",
             !inMonth && "bg-slate-50/70 text-slate-300",
-            effectiveStyle && inMonth && `${effectiveStyle.bg} ${effectiveStyle.border}`,
+            effectiveStyle && !rec?.color && inMonth && `${effectiveStyle.bg} ${effectiveStyle.border}`,
             !effectiveStyle && inMonth && "bg-white",
             isToday && "ring-2 ring-slate-900 ring-offset-1 z-10"
           )}
+          style={rec?.color ? { backgroundColor: rec.color + '20', borderColor: rec.color } : {}} // Light bg for cell
         >
           <div className="flex items-center justify-between">
             <span
@@ -207,8 +287,8 @@ export function AttendanceCalendar({ employeeId }: { employeeId: string }) {
                 isToday
                   ? "bg-slate-900 text-slate-50"
                   : effectiveStyle
-                  ? "bg-white/70 text-slate-800"
-                  : "bg-slate-50 text-slate-600"
+                    ? "bg-white/70 text-slate-800"
+                    : "bg-slate-50 text-slate-600"
               )}
             >
               {format(day, "d")}
@@ -219,10 +299,11 @@ export function AttendanceCalendar({ employeeId }: { employeeId: string }) {
             <div
               className={cn(
                 "mt-1.5 line-clamp-2 leading-snug font-semibold",
-                effectiveStyle.text
+                !rec?.color && effectiveStyle.text
               )}
+              style={rec?.color ? { color: rec.color } : {}}
             >
-              {effectiveStyle.label}
+              {rec?.label || effectiveStyle.label}
             </div>
           )}
 
@@ -306,39 +387,39 @@ export function AttendanceCalendar({ employeeId }: { employeeId: string }) {
         </div>
 
         {/* days grid */}
-        <div>{rows}</div>
+        <div>{loading ? <div className="p-8 text-center text-slate-400">Loading...</div> : rows}</div>
 
         {/* legend */}
         <div className="flex flex-wrap gap-2 sm:gap-3 border-t px-3 sm:px-4 py-2.5 text-[10px] sm:text-[11px] text-slate-500">
           <span className="font-medium">Legend:</span>
-          {(
-            [
-              "OFFICE",
-              "REMOTE",
-              "PL",
-              "CL",
-              "SL",
-              "BL",
-              "ABSENT",
-            ] as AttendanceStatus[]
-          ).map((key) => {
-            const val = statusStyles[key];
-            return (
-              <span key={key} className="inline-flex items-center gap-1">
-                <span
-                  className={cn(
-                    "h-3 w-3 rounded-sm border",
-                    val.bg,
-                    val.border
-                  )}
-                />
-                <span className="font-medium">{val.short}</span>
-                <span className="hidden sm:inline text-slate-400">
-                  · {val.label}
-                </span>
+          {Object.entries(defaultStyles).map(([key, val]) => (
+            <span key={key} className="inline-flex items-center gap-1">
+              <span
+                className={cn(
+                  "h-3 w-3 rounded-sm border",
+                  val.bg,
+                  val.border
+                )}
+              />
+              <span className="font-medium">{val.short}</span>
+              <span className="hidden sm:inline text-slate-400">
+                · {val.label}
               </span>
-            );
-          })}
+            </span>
+          ))}
+          {/* Dynamic Legend Items */}
+          {leaveTypes.map((lt) => (
+            <span key={lt.leave_type} className="inline-flex items-center gap-1">
+              <span
+                className="h-3 w-3 rounded-sm border"
+                style={{ backgroundColor: lt.color, borderColor: lt.color }}
+              />
+              <span className="font-medium">{lt.leave_type.substring(0, 2).toUpperCase()}</span>
+              <span className="hidden sm:inline text-slate-400">
+                · {lt.leave_type}
+              </span>
+            </span>
+          ))}
         </div>
       </div>
     </div>

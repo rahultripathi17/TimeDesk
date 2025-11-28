@@ -63,7 +63,8 @@ export async function POST(request: NextRequest) {
         const upsertData = limits.map((limit: any) => ({
             department,
             leave_type: limit.leave_type,
-            limit_days: limit.limit_days
+            limit_days: limit.limit_days,
+            color: limit.color
         }));
 
         if (upsertData.length > 0) {

@@ -47,18 +47,22 @@ export default function LeaveBalancePage() {
             if (!limitsResponse.ok) throw new Error("Failed to fetch limits");
             const limitsData = await limitsResponse.json();
 
-            // 3. Get User's Leaves for Current Year
-            const currentYear = new Date().getFullYear();
-            const startOfYear = `${currentYear}-01-01`;
-            const endOfYear = `${currentYear}-12-31`;
+            // 3. Get Reset Date & Leaves
+            // Fetch reset date
+            const { data: resetData } = await supabase
+                .from('system_settings')
+                .select('value')
+                .eq('key', 'leave_reset_date')
+                .single();
+
+            const resetDate = resetData?.value || `${new Date().getFullYear()}-01-01`;
 
             const { data: leaves, error: leavesError } = await supabase
                 .from('leaves')
                 .select('type, start_date, end_date, status')
                 .eq('user_id', user.id)
                 .neq('status', 'rejected') // Count approved and pending
-                .gte('start_date', startOfYear)
-                .lte('end_date', endOfYear);
+                .gte('start_date', resetDate);
 
             if (leavesError) throw leavesError;
 

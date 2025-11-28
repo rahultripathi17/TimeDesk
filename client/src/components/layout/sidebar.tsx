@@ -48,10 +48,9 @@ const employeeExtra: NavItem[] = [
   { label: "My Attendance", href: "/dashboard/attendance", icon: CalendarDays },
   {
     label: "Leaves",
-    href: "/leaves",
+    href: "/leaves/apply",
     icon: FileSpreadsheet,
     children: [
-      { label: "My Leaves", href: "/leaves", icon: FileSpreadsheet, exact: true },
       { label: "Apply Leave", href: "/leaves/apply", icon: FileSpreadsheet },
       { label: "Leave Balance", href: "/leaves/balance", icon: FileSpreadsheet },
     ],
@@ -60,7 +59,14 @@ const employeeExtra: NavItem[] = [
 const managerExtra: NavItem[] = [
   { label: "Team Overview", href: "/manager", icon: Users },
   { label: "Team Attendance", href: "/manager/attendance", icon: CalendarDays },
-  { label: "Leave Approvals", href: "/admin/leaves", icon: FileSpreadsheet },
+  {
+    label: "Leaves",
+    href: "/admin/leaves",
+    icon: FileSpreadsheet,
+    children: [
+      { label: "Approvals", href: "/admin/leaves", icon: FileSpreadsheet, exact: true },
+    ],
+  },
 ];
 
 const hrExtra: NavItem[] = [
@@ -77,20 +83,33 @@ const adminExtra: NavItem[] = [
   { label: "Add New User", href: "/admin/users/new", icon: UserPlus, exact: true },
   { label: "Departments", href: "/admin/departments", icon: Users },
   { label: "Master Attendance", href: "/admin/attendance", icon: CalendarDays },
-  { label: "Leave Limits", href: "/admin/leaves/limits", icon: ShieldCheck },
+  {
+    label: "Leaves",
+    href: "/admin/leaves",
+    icon: FileSpreadsheet,
+    children: [
+      { label: "Limits", href: "/admin/leaves/limits", icon: ShieldCheck },
+      { label: "Reset Balances", href: "/admin/leaves/reset", icon: FileSpreadsheet },
+    ],
+  },
   { label: "Reports", href: "/admin/reports", icon: FileSpreadsheet },
 ];
-
 export function navForRole(role: Role): NavItem[] {
   switch (role) {
     case "employee":
       return [...baseItems, ...employeeExtra];
     case "manager":
-      return [...baseItems, ...managerExtra];
+      return managerExtra.map(item =>
+        item.label === "Team Overview" ? { ...item, label: "Home" } : item
+      );
     case "hr":
-      return [...baseItems, ...hrExtra];
+      return hrExtra.map(item =>
+        item.label === "Company Overview" ? { ...item, label: "Home" } : item
+      );
     case "admin":
-      return [...baseItems, ...adminExtra];
+      return adminExtra.map(item =>
+        item.label === "Admin Home" ? { ...item, label: "Home" } : item
+      );
     default:
       return baseItems;
   }
@@ -282,7 +301,8 @@ export function DesktopSidebar({ role }: { role: Role }) {
             >
               {role === "hr" ? "HR" : role} panel
             </span>
-            <button
+            <Link
+              href="/settings"
               className={cn(
                 "flex items-center gap-1 rounded-md p-1.5 text-[11px] hover:bg-slate-100",
                 !isExpanded && "justify-center"
@@ -291,7 +311,7 @@ export function DesktopSidebar({ role }: { role: Role }) {
             >
               <Settings className="h-4 w-4 shrink-0" />
               <span className={cn(!isExpanded && "hidden")}>Settings</span>
-            </button>
+            </Link>
           </div>
 
           <button
@@ -431,10 +451,10 @@ export function MobileSidebar({ role }: { role: Role }) {
             <span className="capitalize">
               {role === "hr" ? "HR" : role} panel
             </span>
-            <button className="flex items-center gap-1 rounded-md px-2 py-1 hover:bg-slate-100">
+            <Link href="/settings" className="flex items-center gap-1 rounded-md px-2 py-1 hover:bg-slate-100">
               <Settings className="h-4 w-4" />
               <span>Settings</span>
-            </button>
+            </Link>
           </div>
 
           <button

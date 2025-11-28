@@ -9,40 +9,102 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CalendarDays, Clock, Home, MapPin, Globe, Palmtree, AlertCircle } from "lucide-react";
+import { CalendarDays, Clock, Home, MapPin, Globe, Palmtree, AlertCircle, CheckCircle2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
-import { format } from "date-fns";
+import { format, isToday } from "date-fns";
 import { supabase } from "@/utils/supabase/client";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { useRouter } from "next/navigation";
 
 export default function EmployeeDashboardPage() {
   const [status, setStatus] = useState<"available" | "remote" | "leave" | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<"available" | "remote" | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchedDate, setFetchedDate] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTodayStatus();
-  }, []);
+
+    // Poll for status updates every minute
+    const interval = setInterval(() => {
+      // This will handle both day changes (by fetching new date) and status updates
+      fetchTodayStatus();
+    }, 60000);
+
+    // Also check on window focus
+    const handleFocus = () => {
+      const currentToday = format(new Date(), 'yyyy-MM-dd');
+      if (fetchedDate && currentToday !== fetchedDate) {
+        console.log("Window focused and day changed, refreshing status...");
+        fetchTodayStatus();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [fetchedDate]);
+
+  const handleStatusSelect = (newStatus: "available" | "remote") => {
+    setSelectedStatus(newStatus);
+  };
+
+  const confirmStatus = () => {
+    if (selectedStatus) {
+      updateStatus(selectedStatus);
+    }
+  };
 
   const fetchTodayStatus = async () => {
     try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
-
       if (!user) return;
 
-      const todayDate = new Date().toISOString().split('T')[0];
-      const { data, error } = await supabase
+      const todayDate = format(new Date(), 'yyyy-MM-dd');
+      setFetchedDate(todayDate);
+
+      // 1. Check Attendance Table First
+      const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendance')
         .select('status, created_at')
-        .eq('user_id', user.id) // Assuming we have a user_id that matches profile id
+        .eq('user_id', user.id)
         .eq('date', todayDate)
-        .single();
+        .maybeSingle();
 
-      if (data) {
-        setStatus(data.status as any);
-        setLastUpdated(format(new Date(data.created_at), "h:mm a"));
+      if (attendanceData) {
+        setStatus(attendanceData.status as any);
+        const date = new Date(attendanceData.created_at);
+        setLastUpdated(isToday(date) ? format(date, "h:mm a") : format(date, "MMM d, h:mm a"));
+        return;
       }
+
+      // 2. Fallback: Check Leaves Table if no attendance record
+      const { data: leaveData, error: leaveError } = await supabase
+        .from('leaves')
+        .select('status, updated_at, created_at')
+        .eq('user_id', user.id)
+        .lte('start_date', todayDate)
+        .gte('end_date', todayDate)
+        .eq('status', 'approved')
+        .maybeSingle();
+
+      if (leaveData) {
+        setStatus('leave');
+        // Use updated_at if available, else created_at
+        const date = new Date(leaveData.updated_at || leaveData.created_at);
+        setLastUpdated(isToday(date) ? format(date, "h:mm a") : format(date, "MMM d, h:mm a"));
+      } else {
+        // 3. No Status Found - Reset State
+        setStatus(null);
+        setLastUpdated(null);
+      }
+
     } catch (error) {
       console.error('Error fetching status:', error);
     } finally {
@@ -50,21 +112,50 @@ export default function EmployeeDashboardPage() {
     }
   };
 
+  const router = useRouter();
+
   const updateStatus = async (newStatus: "available" | "remote" | "leave") => {
     try {
+      setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         alert("You must be logged in to update status.");
         return;
       }
 
-      const todayDate = new Date().toISOString().split('T')[0];
+      const todayDate = format(new Date(), 'yyyy-MM-dd');
+
+      if (newStatus === "leave") {
+        // Check if leave is applied for today
+        const { data: leaveData, error: leaveError } = await supabase
+          .from('leaves')
+          .select('id, status')
+          .eq('user_id', user.id)
+          .lte('start_date', todayDate)
+          .gte('end_date', todayDate)
+          .in('status', ['approved', 'pending']) // Check for approved or pending leaves
+          .maybeSingle();
+
+        if (leaveError) {
+          console.error("Error checking leave status:", leaveError);
+          // Continue to redirect if error? Or stop? Let's stop and alert.
+          alert("Error checking leave status. Please try again.");
+          return;
+        }
+
+        if (!leaveData) {
+          // No leave found, redirect to apply
+          router.push("/leaves/apply");
+          return;
+        }
+        // If leave exists, proceed to update status to 'leave'
+      }
 
       // Upsert attendance record
       const { error } = await supabase
         .from('attendance')
         .upsert({
-          user_id: user.id, // This assumes the auth user ID matches the profile ID
+          user_id: user.id,
           date: todayDate,
           status: newStatus,
           created_at: new Date().toISOString()
@@ -77,6 +168,8 @@ export default function EmployeeDashboardPage() {
     } catch (error: any) {
       console.error('Error updating status:', error);
       alert("Failed to update status: " + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -156,35 +249,65 @@ export default function EmployeeDashboardPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                <Button
-                  variant={status === "available" ? "default" : "outline"}
-                  className={status === "available" ? "bg-emerald-600 hover:bg-emerald-700" : "justify-start"}
-                  onClick={() => updateStatus("available")}
-                  disabled={loading}
-                >
-                  <Home className="mr-2 h-4 w-4" />
-                  Office
-                </Button>
-                <Button
-                  variant={status === "remote" ? "default" : "outline"}
-                  className={status === "remote" ? "bg-blue-600 hover:bg-blue-700" : "justify-start"}
-                  onClick={() => updateStatus("remote")}
-                  disabled={loading}
-                >
-                  <Globe className="mr-2 h-4 w-4" />
-                  Remote
-                </Button>
-                <Button
-                  variant={status === "leave" ? "default" : "outline"}
-                  className={status === "leave" ? "bg-amber-600 hover:bg-amber-700" : "justify-start"}
-                  onClick={() => updateStatus("leave")}
-                  disabled={loading}
-                >
-                  <Palmtree className="mr-2 h-4 w-4" />
-                  On leave
-                </Button>
-              </div>
+              {!status && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <Button
+                      variant={selectedStatus === "available" ? "default" : "outline"}
+                      className={cn(
+                        "justify-start transition-all",
+                        selectedStatus === "available" ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600" : "hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+                      )}
+                      onClick={() => handleStatusSelect("available")}
+                      disabled={loading}
+                    >
+                      <Home className="mr-2 h-4 w-4" />
+                      Office
+                    </Button>
+                    <Button
+                      variant={selectedStatus === "remote" ? "default" : "outline"}
+                      className={cn(
+                        "justify-start transition-all",
+                        selectedStatus === "remote" ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600" : "hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                      )}
+                      onClick={() => handleStatusSelect("remote")}
+                      disabled={loading}
+                    >
+                      <Globe className="mr-2 h-4 w-4" />
+                      Remote
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="justify-start hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700"
+                      onClick={() => updateStatus("leave")}
+                      disabled={loading}
+                    >
+                      <Palmtree className="mr-2 h-4 w-4" />
+                      On leave
+                    </Button>
+                  </div>
+
+                  {selectedStatus && (
+                    <div className="flex animate-in fade-in slide-in-from-top-2">
+                      <Button
+                        className="w-full gap-2 bg-slate-900 text-white hover:bg-slate-800"
+                        onClick={confirmStatus}
+                        disabled={loading}
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        Confirm & Mark Attendance
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {status && (
+                <div className="rounded-lg bg-slate-50 p-4 text-center">
+                  <p className="text-xs text-slate-500 mb-1">Attendance marked for today</p>
+                  <p className="text-sm font-medium text-slate-900">You cannot change your status once marked.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
