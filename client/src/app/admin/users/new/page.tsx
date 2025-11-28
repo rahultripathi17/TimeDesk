@@ -35,14 +35,7 @@ import { supabase } from "@/utils/supabase/client";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, Suspense } from "react";
 
-// Mock data for managers
-const MANAGERS = [
-    { value: "amit", label: "Amit Sharma" },
-    { value: "priya", label: "Priya Singh" },
-    { value: "rahul", label: "Rahul Tripathi" },
-    { value: "sneha", label: "Sneha Gupta" },
-    { value: "vikram", label: "Vikram Malhotra" },
-];
+
 
 const INDIAN_STATES = [
     "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat",
@@ -71,6 +64,7 @@ function AddUserForm() {
     const [dob, setDob] = useState<Date>();
     const [openManager, setOpenManager] = useState(false);
     const [selectedManagers, setSelectedManagers] = useState<string[]>([]);
+    const [managersList, setManagersList] = useState<{ value: string, label: string }[]>([]);
     const [fullName, setFullName] = useState("");
     const [profilePic, setProfilePic] = useState<string | null>(null);
 
@@ -78,6 +72,7 @@ function AddUserForm() {
     const [email, setEmail] = useState("");
     const [personalEmail, setPersonalEmail] = useState("");
     const [phone, setPhone] = useState("");
+    const [gender, setGender] = useState("");
     const [address, setAddress] = useState("");
     const [city, setCity] = useState("");
     const [state, setState] = useState("");
@@ -89,7 +84,7 @@ function AddUserForm() {
     const [bankName, setBankName] = useState("");
     const [accountNumber, setAccountNumber] = useState("");
     const [ifsc, setIfsc] = useState("");
-    const [username, setUsername] = useState("");
+    // Username is now same as email
     const [role, setRole] = useState("");
     const [designation, setDesignation] = useState("");
 
@@ -98,10 +93,31 @@ function AddUserForm() {
     const [success, setSuccess] = useState(false);
 
     useEffect(() => {
+        fetchManagers();
         if (isEditMode && userId) {
             fetchUserData(userId);
         }
     }, [isEditMode, userId]);
+
+    const fetchManagers = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('id, full_name')
+                .eq('role', 'manager');
+
+            if (error) throw error;
+
+            if (data) {
+                setManagersList(data.map(user => ({
+                    value: user.id,
+                    label: user.full_name
+                })));
+            }
+        } catch (err) {
+            console.error("Error fetching managers:", err);
+        }
+    };
 
     const fetchUserData = async (id: string) => {
         setLoading(true);
@@ -125,7 +141,6 @@ function AddUserForm() {
             // Populate State
             setFullName(profile.full_name || "");
             setEmail(profile.email || "");
-            setUsername(profile.username || "");
             setRole(profile.role || "");
             setDesignation(profile.designation || "");
             setDepartment(profile.department || "");
@@ -136,6 +151,7 @@ function AddUserForm() {
             if (details) {
                 setPersonalEmail(details.personal_email || "");
                 setPhone(details.phone_number || "");
+                setGender(details.gender || "");
                 setDob(details.dob ? new Date(details.dob) : undefined);
                 setAddress(details.address || "");
                 setCity(details.city || "");
@@ -201,6 +217,7 @@ function AddUserForm() {
                 email,
                 personalEmail,
                 phone,
+                gender: gender === "Select gender" ? null : gender,
                 dob: dob ? dob.toISOString().split('T')[0] : null,
                 avatarUrl: profilePic,
 
@@ -224,7 +241,7 @@ function AddUserForm() {
                 ifsc,
 
                 // Account
-                username,
+                username: email,
                 password: (document.getElementById('password') as HTMLInputElement).value, // Password is special, only send if changed
 
                 // Role
@@ -234,8 +251,12 @@ function AddUserForm() {
             };
 
             // Basic Validation
-            if (!formData.fullName || !formData.email || !formData.username || (!isEditMode && !formData.password) || !formData.dateOfJoining) {
+            if (!formData.fullName || !formData.email || (!isEditMode && !formData.password) || !formData.dateOfJoining) {
                 throw new Error("Please fill in all required fields (marked with *)");
+            }
+
+            if (formData.password && formData.password.length < 6) {
+                throw new Error("Password must be at least 6 characters long");
             }
 
             const method = isEditMode ? 'PUT' : 'POST';
@@ -341,12 +362,7 @@ function AddUserForm() {
                                             onChange={(e) => setFullName(e.target.value)}
                                         />
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="email" className="text-xs font-medium">
-                                            Official Email <span className="text-red-500">*</span>
-                                        </Label>
-                                        <Input id="email" type="email" placeholder="e.g. rahul@company.com" />
-                                    </div>
+
                                     <div className="space-y-2">
                                         <Label htmlFor="personalEmail" className="text-xs font-medium">
                                             Personal Email
@@ -358,6 +374,21 @@ function AddUserForm() {
                                             Phone Number
                                         </Label>
                                         <Input id="phone" type="tel" placeholder="e.g. +91 9876543210" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="gender" className="text-xs font-medium">
+                                            Gender
+                                        </Label>
+                                        <Select value={gender} onValueChange={setGender}>
+                                            <SelectTrigger id="gender">
+                                                <SelectValue placeholder="Select gender" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Male">Male</SelectItem>
+                                                <SelectItem value="Female">Female</SelectItem>
+                                                <SelectItem value="Other">Other</SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="dob" className="text-xs font-medium">
@@ -395,7 +426,7 @@ function AddUserForm() {
                                         <Label htmlFor="state" className="text-xs font-medium">
                                             State
                                         </Label>
-                                        <Select>
+                                        <Select value={state} onValueChange={setState}>
                                             <SelectTrigger id="state">
                                                 <SelectValue placeholder="Select state" />
                                             </SelectTrigger>
@@ -452,13 +483,15 @@ function AddUserForm() {
                                             id="doj"
                                             type="date"
                                             className="w-full"
+                                            value={doj}
+                                            onChange={(e) => setDoj(e.target.value)}
                                         />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="department" className="text-xs font-medium">
                                             Department <span className="text-red-500">*</span>
                                         </Label>
-                                        <Select>
+                                        <Select value={department} onValueChange={setDepartment}>
                                             <SelectTrigger id="department">
                                                 <SelectValue placeholder="Select department" />
                                             </SelectTrigger>
@@ -511,16 +544,25 @@ function AddUserForm() {
                                 </h3>
                                 <div className="grid gap-4 md:grid-cols-2">
                                     <div className="space-y-2">
-                                        <Label htmlFor="username" className="text-xs font-medium">
-                                            Username <span className="text-red-500">*</span>
+                                        <Label htmlFor="email" className="text-xs font-medium">
+                                            Official Email (Username) <span className="text-red-500">*</span>
                                         </Label>
-                                        <Input id="username" placeholder="e.g. rahul.tripathi" />
+                                        <Input
+                                            id="email"
+                                            type="email"
+                                            placeholder="e.g. rahul@company.com"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                        />
+                                        <p className="text-[10px] text-slate-500">
+                                            Use the official email address for login.
+                                        </p>
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="password" className="text-xs font-medium">
                                             Password <span className="text-red-500">*</span>
                                         </Label>
-                                        <Input id="password" type="password" placeholder="••••••••" />
+                                        <Input id="password" type="password" placeholder="••••••••" minLength={6} />
                                     </div>
                                 </div>
                             </div>
@@ -535,7 +577,7 @@ function AddUserForm() {
                                         <Label htmlFor="role" className="text-xs font-medium">
                                             Role <span className="text-red-500">*</span>
                                         </Label>
-                                        <Select>
+                                        <Select value={role} onValueChange={setRole}>
                                             <SelectTrigger id="role">
                                                 <SelectValue placeholder="Select role" />
                                             </SelectTrigger>
@@ -579,7 +621,7 @@ function AddUserForm() {
                                                     <CommandList>
                                                         <CommandEmpty>No manager found.</CommandEmpty>
                                                         <CommandGroup>
-                                                            {MANAGERS.map((manager) => (
+                                                            {managersList.map((manager) => (
                                                                 <CommandItem
                                                                     key={manager.value}
                                                                     value={manager.value}
@@ -606,7 +648,7 @@ function AddUserForm() {
                                         {selectedManagers.length > 0 && (
                                             <div className="flex flex-wrap gap-2 mt-2">
                                                 {selectedManagers.map((value) => {
-                                                    const manager = MANAGERS.find((m) => m.value === value);
+                                                    const manager = managersList.find((m) => m.value === value);
                                                     return (
                                                         <Badge key={value} variant="secondary" className="pl-2 pr-1 py-1">
                                                             {manager?.label}
@@ -651,7 +693,7 @@ function AddUserForm() {
                         </form>
                     </CardContent>
                 </Card>
-            </div>
-        </AppShell>
+            </div >
+        </AppShell >
     );
 }

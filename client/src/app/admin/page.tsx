@@ -3,18 +3,16 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+
 export default function AdminDashboardPage() {
   return (
     <AppShell role="admin">
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
-        <header className="mb-4">
-          <h1 className="text-lg font-semibold text-slate-900">
-            Admin Dashboard
-          </h1>
-          <p className="text-xs text-slate-500">
-            Control panel for users, roles, and company settings.
-          </p>
-        </header>
+        <DashboardHeader
+          title="Admin Dashboard"
+          description="Control panel for users, roles, and company settings."
+        />
 
         <section className="grid gap-4 md:grid-cols-2">
           <Card>

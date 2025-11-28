@@ -3,18 +3,16 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+
 export default function HrDashboardPage() {
   return (
     <AppShell role="hr">
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
-        <header className="mb-4">
-          <h1 className="text-lg font-semibold text-slate-900">
-            HR Dashboard
-          </h1>
-          <p className="text-xs text-slate-500">
-            Company-wide attendance and leave overview.
-          </p>
-        </header>
+        <DashboardHeader
+          title="HR Dashboard"
+          description="Company-wide attendance and leave overview."
+        />
 
         <section className="grid gap-4 md:grid-cols-2">
           <Card>

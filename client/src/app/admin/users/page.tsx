@@ -112,6 +112,11 @@ export default function UsersListPage() {
         return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
     };
 
+    const getManagerName = (id: string) => {
+        const manager = users.find(u => u.id === id);
+        return manager ? manager.full_name : "Unknown Manager";
+    };
+
     const handleDeleteUser = async () => {
         if (!deleteUserId) return;
 
@@ -352,14 +357,14 @@ export default function UsersListPage() {
 
             {/* View User Dialog */}
             <Dialog open={!!viewUser} onOpenChange={(open) => !open && setViewUser(null)}>
-                <DialogContent className="max-w-3xl">
+                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader className="border-b pb-4">
                         <DialogTitle>User Profile</DialogTitle>
                     </DialogHeader>
                     {viewUser && (
-                        <div className="py-2">
+                        <div className="py-4 space-y-8">
                             {/* Header Section */}
-                            <div className="flex flex-col md:flex-row items-center md:items-start gap-6 mb-8">
+                            <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
                                 <Avatar className="h-24 w-24 border-4 border-white shadow-sm">
                                     <AvatarImage src={viewUser.avatar_url} />
                                     <AvatarFallback className="text-3xl bg-blue-50 text-blue-600 font-semibold">
@@ -378,16 +383,15 @@ export default function UsersListPage() {
                                         <Badge variant="outline" className={cn("px-3 py-1 text-sm font-medium capitalize border-0", getStatusColor(viewUser.status))}>
                                             {viewUser.status}
                                         </Badge>
-                                        {viewUser.details?.city && (
+                                        {viewUser.details?.gender && (
                                             <Badge variant="outline" className="px-3 py-1 text-sm font-normal text-slate-600">
-                                                📍 {viewUser.details.city}, {viewUser.details.state}
+                                                {viewUser.details.gender}
                                             </Badge>
                                         )}
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Details Grid */}
                             <div className="grid md:grid-cols-2 gap-8">
                                 {/* Professional Details */}
                                 <div className="space-y-4">
@@ -395,60 +399,139 @@ export default function UsersListPage() {
                                         <Users className="h-4 w-4" />
                                         <h4>Professional Details</h4>
                                     </div>
-                                    <div className="grid gap-4">
-                                        <div className="grid grid-cols-3 gap-2 text-sm">
-                                            <span className="text-slate-500">Designation</span>
-                                            <span className="col-span-2 font-medium text-slate-900">{viewUser.designation || "Not Assigned"}</span>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-2 text-sm">
-                                            <span className="text-slate-500">Department</span>
-                                            <span className="col-span-2 font-medium text-slate-900">{viewUser.department || "Not Assigned"}</span>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-2 text-sm">
-                                            <span className="text-slate-500">Joined On</span>
-                                            <span className="col-span-2 font-medium text-slate-900">{viewUser.date_of_joining || "N/A"}</span>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-2 text-sm">
-                                            <span className="text-slate-500">Manager(s)</span>
-                                            <div className="col-span-2 flex flex-wrap gap-1">
-                                                {viewUser.reporting_managers?.length > 0 ? (
-                                                    viewUser.reporting_managers.map((m: string) => (
-                                                        <Badge key={m} variant="outline" className="text-xs font-normal">
-                                                            {m}
-                                                        </Badge>
-                                                    ))
-                                                ) : (
-                                                    <span className="text-slate-400 italic">None</span>
-                                                )}
+                                    <div className="grid gap-3">
+                                        {viewUser.designation && (
+                                            <div className="grid grid-cols-3 gap-2 text-sm">
+                                                <span className="text-slate-500">Designation</span>
+                                                <span className="col-span-2 font-medium text-slate-900">{viewUser.designation}</span>
                                             </div>
-                                        </div>
+                                        )}
+                                        {viewUser.department && (
+                                            <div className="grid grid-cols-3 gap-2 text-sm">
+                                                <span className="text-slate-500">Department</span>
+                                                <span className="col-span-2 font-medium text-slate-900">{viewUser.department}</span>
+                                            </div>
+                                        )}
+                                        {viewUser.date_of_joining && (
+                                            <div className="grid grid-cols-3 gap-2 text-sm">
+                                                <span className="text-slate-500">Joined On</span>
+                                                <span className="col-span-2 font-medium text-slate-900">{viewUser.date_of_joining}</span>
+                                            </div>
+                                        )}
+                                        {viewUser.reporting_managers?.length > 0 && (
+                                            <div className="grid grid-cols-3 gap-2 text-sm">
+                                                <span className="text-slate-500">Manager(s)</span>
+                                                <div className="col-span-2 flex flex-wrap gap-1">
+                                                    {viewUser.reporting_managers.map((m: string) => (
+                                                        <Badge key={m} variant="outline" className="text-xs font-normal bg-slate-50">
+                                                            {getManagerName(m)}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
-                                {/* Personal & Account Details */}
+                                {/* Personal & Contact */}
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-2 text-slate-900 font-semibold border-b pb-2">
                                         <User className="h-4 w-4" />
-                                        <h4>Personal & Account</h4>
+                                        <h4>Personal & Contact</h4>
                                     </div>
-                                    <div className="grid gap-4">
+                                    <div className="grid gap-3">
+                                        {viewUser.details?.phone_number && (
+                                            <div className="grid grid-cols-3 gap-2 text-sm">
+                                                <span className="text-slate-500">Phone</span>
+                                                <span className="col-span-2 font-medium text-slate-900">{viewUser.details.phone_number}</span>
+                                            </div>
+                                        )}
+                                        {viewUser.details?.personal_email && (
+                                            <div className="grid grid-cols-3 gap-2 text-sm">
+                                                <span className="text-slate-500">Email (Personal)</span>
+                                                <span className="col-span-2 font-medium text-slate-900 truncate" title={viewUser.details.personal_email}>
+                                                    {viewUser.details.personal_email}
+                                                </span>
+                                            </div>
+                                        )}
+                                        {viewUser.details?.dob && (
+                                            <div className="grid grid-cols-3 gap-2 text-sm">
+                                                <span className="text-slate-500">Date of Birth</span>
+                                                <span className="col-span-2 font-medium text-slate-900">{viewUser.details.dob}</span>
+                                            </div>
+                                        )}
+                                        {([viewUser.details?.address, viewUser.details?.city, viewUser.details?.state, viewUser.details?.pincode].some(Boolean)) && (
+                                            <div className="grid grid-cols-3 gap-2 text-sm">
+                                                <span className="text-slate-500">Address</span>
+                                                <span className="col-span-2 font-medium text-slate-900">
+                                                    {[
+                                                        viewUser.details?.address,
+                                                        viewUser.details?.city,
+                                                        viewUser.details?.state,
+                                                        viewUser.details?.pincode
+                                                    ].filter(Boolean).join(", ")}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Identity & Banking */}
+                                {(viewUser.details?.pan_number || viewUser.details?.aadhaar_number || viewUser.details?.bank_name || viewUser.details?.account_number || viewUser.details?.ifsc_code) && (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-2 text-slate-900 font-semibold border-b pb-2">
+                                            <UserCheck className="h-4 w-4" />
+                                            <h4>Identity & Banking</h4>
+                                        </div>
+                                        <div className="grid gap-3">
+                                            {viewUser.details?.pan_number && (
+                                                <div className="grid grid-cols-3 gap-2 text-sm">
+                                                    <span className="text-slate-500">PAN Number</span>
+                                                    <span className="col-span-2 font-medium text-slate-900 uppercase">{viewUser.details.pan_number}</span>
+                                                </div>
+                                            )}
+                                            {viewUser.details?.aadhaar_number && (
+                                                <div className="grid grid-cols-3 gap-2 text-sm">
+                                                    <span className="text-slate-500">Aadhaar</span>
+                                                    <span className="col-span-2 font-medium text-slate-900">{viewUser.details.aadhaar_number}</span>
+                                                </div>
+                                            )}
+                                            {viewUser.details?.bank_name && (
+                                                <div className="grid grid-cols-3 gap-2 text-sm">
+                                                    <span className="text-slate-500">Bank Name</span>
+                                                    <span className="col-span-2 font-medium text-slate-900">{viewUser.details.bank_name}</span>
+                                                </div>
+                                            )}
+                                            {viewUser.details?.account_number && (
+                                                <div className="grid grid-cols-3 gap-2 text-sm">
+                                                    <span className="text-slate-500">Account No</span>
+                                                    <span className="col-span-2 font-medium text-slate-900">{viewUser.details.account_number}</span>
+                                                </div>
+                                            )}
+                                            {viewUser.details?.ifsc_code && (
+                                                <div className="grid grid-cols-3 gap-2 text-sm">
+                                                    <span className="text-slate-500">IFSC Code</span>
+                                                    <span className="col-span-2 font-medium text-slate-900 uppercase">{viewUser.details.ifsc_code}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Account Info */}
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2 text-slate-900 font-semibold border-b pb-2">
+                                        <UserCog className="h-4 w-4" />
+                                        <h4>Account Info</h4>
+                                    </div>
+                                    <div className="grid gap-3">
                                         <div className="grid grid-cols-3 gap-2 text-sm">
                                             <span className="text-slate-500">Username</span>
                                             <span className="col-span-2 font-medium text-slate-900">{viewUser.username}</span>
                                         </div>
                                         <div className="grid grid-cols-3 gap-2 text-sm">
-                                            <span className="text-slate-500">Phone</span>
-                                            <span className="col-span-2 font-medium text-slate-900">{viewUser.details?.phone_number || "N/A"}</span>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-2 text-sm">
-                                            <span className="text-slate-500">Personal Email</span>
-                                            <span className="col-span-2 font-medium text-slate-900 truncate" title={viewUser.details?.personal_email}>
-                                                {viewUser.details?.personal_email || "N/A"}
-                                            </span>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-2 text-sm">
                                             <span className="text-slate-500">User ID</span>
-                                            <span className="col-span-2 font-mono text-xs text-slate-500 bg-slate-50 p-1 rounded">
+                                            <span className="col-span-2 font-mono text-[10px] text-slate-400 break-all">
                                                 {viewUser.id}
                                             </span>
                                         </div>

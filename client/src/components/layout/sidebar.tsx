@@ -47,20 +47,20 @@ const baseItems: NavItem[] = [
 const employeeExtra: NavItem[] = [
   { label: "My Attendance", href: "/dashboard/attendance", icon: CalendarDays },
   {
-    label: "Leave",
-    href: "/dashboard/leave",
+    label: "Leaves",
+    href: "/leaves",
     icon: FileSpreadsheet,
     children: [
-      { label: "Leave Apply", href: "/dashboard/leave/apply", icon: FileSpreadsheet },
-      { label: "Leave Balances", href: "/dashboard/leave/balance", icon: FileSpreadsheet },
+      { label: "My Leaves", href: "/leaves", icon: FileSpreadsheet, exact: true },
+      { label: "Apply Leave", href: "/leaves/apply", icon: FileSpreadsheet },
+      { label: "Leave Balance", href: "/leaves/balance", icon: FileSpreadsheet },
     ],
   },
 ];
-
 const managerExtra: NavItem[] = [
   { label: "Team Overview", href: "/manager", icon: Users },
   { label: "Team Attendance", href: "/manager/attendance", icon: CalendarDays },
-  { label: "Approvals", href: "/manager/approvals", icon: FileSpreadsheet },
+  { label: "Leave Approvals", href: "/admin/leaves", icon: FileSpreadsheet },
 ];
 
 const hrExtra: NavItem[] = [
@@ -76,6 +76,7 @@ const adminExtra: NavItem[] = [
   { label: "Users & Roles", href: "/admin/users", icon: Users, exact: true },
   { label: "Add New User", href: "/admin/users/new", icon: UserPlus, exact: true },
   { label: "Master Attendance", href: "/admin/attendance", icon: CalendarDays },
+  { label: "Leave Limits", href: "/admin/leaves/limits", icon: ShieldCheck },
   { label: "Reports", href: "/admin/reports", icon: FileSpreadsheet },
 ];
 

@@ -13,9 +13,9 @@ import { CalendarDays, Clock, Home, MapPin, Globe, Palmtree, AlertCircle } from 
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { supabase } from "@/utils/supabase/client";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 
 export default function EmployeeDashboardPage() {
-  const today = format(new Date(), "EEEE, d MMM");
   const [status, setStatus] = useState<"available" | "remote" | "leave" | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -124,15 +124,7 @@ export default function EmployeeDashboardPage() {
   return (
     <AppShell role="employee">
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
-        <header className="mb-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs text-slate-500">Welcome back</p>
-            <h1 className="text-lg font-semibold text-slate-900">
-              My Dashboard
-            </h1>
-          </div>
-          <p className="text-xs text-slate-500">Today · {today}</p>
-        </header>
+        <DashboardHeader title="My Dashboard" />
 
         <section className="grid gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
           {/* Today's status */}
