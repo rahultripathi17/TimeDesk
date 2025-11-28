@@ -18,6 +18,7 @@ import {
   ChevronDown,
   UserPlus,
   LogOut,
+  Megaphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -93,7 +94,7 @@ const adminExtra: NavItem[] = [
     ],
   },
   { label: "Reports", href: "/admin/reports", icon: FileSpreadsheet },
-  { label: "Notice Board", href: "/admin/settings", icon: Settings },
+  { label: "Notice Board", href: "/admin/settings", icon: Megaphone },
 ];
 export function navForRole(role: Role): NavItem[] {
   switch (role) {
@@ -303,7 +304,7 @@ export function DesktopSidebar({ role }: { role: Role }) {
               {role === "hr" ? "HR" : role} panel
             </span>
             <Link
-              href={role === "admin" ? "/admin/settings" : "/settings"}
+              href="/settings"
               className={cn(
                 "flex items-center gap-1 rounded-md p-1.5 text-[11px] hover:bg-slate-100",
                 !isExpanded && "justify-center"
