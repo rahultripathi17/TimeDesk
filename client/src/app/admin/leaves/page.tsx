@@ -31,9 +31,26 @@ export default function LeaveApprovalPage() {
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
 
+    const [userRole, setUserRole] = useState<string>("manager");
+
     useEffect(() => {
         fetchLeaves();
+        fetchUserRole();
     }, []);
+
+    const fetchUserRole = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', user.id)
+                .single();
+            if (profile) {
+                setUserRole(profile.role);
+            }
+        }
+    };
 
     const fetchLeaves = async () => {
         try {
@@ -108,7 +125,7 @@ export default function LeaveApprovalPage() {
     };
 
     return (
-        <AppShell role="manager">
+        <AppShell role={userRole as any}>
             <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
                 <header className="mb-6">
                     <h1 className="text-lg font-semibold text-slate-900">Leave Requests</h1>

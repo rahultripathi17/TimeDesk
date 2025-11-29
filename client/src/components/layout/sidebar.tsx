@@ -58,25 +58,40 @@ const employeeExtra: NavItem[] = [
   },
 ];
 const managerExtra: NavItem[] = [
+  { label: "My Attendance", href: "/dashboard/attendance", icon: CalendarDays },
   { label: "Team Attendance", href: "/manager/attendance", icon: CalendarDays },
   {
     label: "Leaves",
     href: "/admin/leaves",
     icon: FileSpreadsheet,
     children: [
+      { label: "Apply Leave", href: "/leaves/apply", icon: FileSpreadsheet },
+      { label: "Leave Balance", href: "/leaves/balance", icon: FileSpreadsheet },
       { label: "Approvals", href: "/admin/leaves", icon: FileSpreadsheet, exact: true },
     ],
   },
 ];
 
 const hrExtra: NavItem[] = [
+  { label: "My Attendance", href: "/dashboard/attendance", icon: CalendarDays },
   { label: "All Attendance", href: "/hr/attendance", icon: CalendarDays },
   { label: "Teams & Depts", href: "/hr/teams", icon: Users },
+  {
+    label: "Leaves",
+    href: "/leaves/apply",
+    icon: FileSpreadsheet,
+    children: [
+      { label: "Apply Leave", href: "/leaves/apply", icon: FileSpreadsheet },
+      { label: "Leave Balance", href: "/leaves/balance", icon: FileSpreadsheet },
+      { label: "Approvals", href: "/admin/leaves", icon: FileSpreadsheet, exact: true },
+    ],
+  },
   { label: "Reports", href: "/hr/reports", icon: FileSpreadsheet },
   { label: "Policies", href: "/hr/policies", icon: ShieldCheck },
 ];
 
 const adminExtra: NavItem[] = [
+  { label: "My Attendance", href: "/dashboard/attendance", icon: CalendarDays },
   { label: "Users & Roles", href: "/admin/users", icon: Users, exact: true },
   { label: "Add New User", href: "/admin/users/new", icon: UserPlus, exact: true },
   { label: "Departments", href: "/admin/departments", icon: Users },
@@ -86,7 +101,10 @@ const adminExtra: NavItem[] = [
     href: "/admin/leaves",
     icon: FileSpreadsheet,
     children: [
+      { label: "Apply Leave", href: "/leaves/apply", icon: FileSpreadsheet },
+      { label: "Leave Balance", href: "/leaves/balance", icon: FileSpreadsheet },
       { label: "Limits", href: "/admin/leaves/limits", icon: ShieldCheck },
+      { label: "Approvals", href: "/admin/leaves", icon: FileSpreadsheet, exact: true },
       { label: "Reset Balances", href: "/admin/leaves/reset", icon: FileSpreadsheet },
     ],
   },

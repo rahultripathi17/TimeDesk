@@ -15,10 +15,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
-        // 1. Get User's Department
+        // 1. Get User's Department and Role
         const { data: profile, error: profileError } = await supabaseAdmin
             .from('profiles')
-            .select('department')
+            .select('department, role')
             .eq('id', userId)
             .single();
 
@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
         }
 
         const department = profile.department;
+        const isAdmin = profile.role === 'admin';
 
         if (department) {
             // 2. Get Leave Limit for Department & Type
@@ -85,6 +86,11 @@ export async function POST(request: NextRequest) {
         }
 
         // 5. Insert Leave Request
+        // If Admin, auto-approve
+        const status = isAdmin ? 'approved' : 'pending';
+        // If Admin, they approve themselves (or system approves)
+        const finalApproverId = isAdmin ? userId : approverId;
+
         const { data, error } = await supabaseAdmin
             .from('leaves')
             .insert({
@@ -93,8 +99,8 @@ export async function POST(request: NextRequest) {
                 start_date: startDate,
                 end_date: endDate,
                 reason,
-                approver_id: approverId,
-                status: 'pending'
+                approver_id: finalApproverId,
+                status
             })
             .select()
             .single();

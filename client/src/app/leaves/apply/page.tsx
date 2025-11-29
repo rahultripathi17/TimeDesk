@@ -56,7 +56,8 @@ export default function ApplyLeavePage() {
     // Data State
     const [limits, setLimits] = useState<LeaveLimit[]>([]);
     const [department, setDepartment] = useState<string | null>(null);
-    const [approvers, setApprovers] = useState<{ id: string, full_name: string, department: string | null }[]>([]);
+    const [approvers, setApprovers] = useState<{ id: string, full_name: string, department: string | null, designation: string | null, role: string }[]>([]);
+    const [userRole, setUserRole] = useState<string>("");
     const [selectedApproverId, setSelectedApproverId] = useState<string>("");
     const [pendingLeaves, setPendingLeaves] = useState<LeaveRequest[]>([]);
     const [historyLeaves, setHistoryLeaves] = useState<LeaveRequest[]>([]);
@@ -92,7 +93,7 @@ export default function ApplyLeavePage() {
             // 1. Get Profile & Department
             const { data: profile } = await supabase
                 .from('profiles')
-                .select('department, reporting_managers')
+                .select('department, reporting_managers, role')
                 .eq('id', user.id)
                 .single();
 
@@ -102,29 +103,56 @@ export default function ApplyLeavePage() {
                     await getLeaveBalance(user.id, profile.department);
                 }
 
-                // 2. Get Approvers
-                let potentialApprovers: { id: string, full_name: string, department: string | null }[] = [];
+                // 2. Get Approvers based on Role
+                let potentialApprovers: { id: string, full_name: string, department: string | null, designation: string | null, role: string }[] = [];
+                const role = profile.role;
+                setUserRole(role);
 
-                // First check direct reporting managers
-                if (profile.reporting_managers && profile.reporting_managers.length > 0) {
-                    const { data: managers } = await supabase
+                if (role === 'admin') {
+                    // Admins are auto-approved, no approver needed
+                    potentialApprovers = [];
+                } else if (role === 'hr') {
+                    // HR reports to Admin
+                    const { data: admins } = await supabase
                         .from('profiles')
-                        .select('id, full_name, department')
-                        .in('id', profile.reporting_managers);
+                        .select('id, full_name, department, designation, role')
+                        .eq('role', 'admin');
 
-                    if (managers) potentialApprovers = managers;
-                }
+                    if (admins) potentialApprovers = admins;
 
-                // Fallback: Find any manager in department if no direct managers
-                if (potentialApprovers.length === 0 && profile.department) {
-                    const { data: deptManagers } = await supabase
+                } else if (role === 'manager') {
+                    // Managers report to HR
+                    const { data: hrs } = await supabase
                         .from('profiles')
-                        .select('id, full_name, department')
-                        .eq('department', profile.department)
-                        .eq('role', 'manager')
-                        .neq('id', user.id); // Don't select self
+                        .select('id, full_name, department, designation, role')
+                        .eq('role', 'hr');
 
-                    if (deptManagers) potentialApprovers = deptManagers;
+                    if (hrs) potentialApprovers = hrs;
+
+                } else {
+                    // Employees report to Managers (Existing Logic)
+
+                    // First check direct reporting managers
+                    if (profile.reporting_managers && profile.reporting_managers.length > 0) {
+                        const { data: managers } = await supabase
+                            .from('profiles')
+                            .select('id, full_name, department, designation, role')
+                            .in('id', profile.reporting_managers);
+
+                        if (managers) potentialApprovers = managers;
+                    }
+
+                    // Fallback: Find any manager in department if no direct managers
+                    if (potentialApprovers.length === 0 && profile.department) {
+                        const { data: deptManagers } = await supabase
+                            .from('profiles')
+                            .select('id, full_name, department, designation, role')
+                            .eq('department', profile.department)
+                            .eq('role', 'manager')
+                            .neq('id', user.id); // Don't select self
+
+                        if (deptManagers) potentialApprovers = deptManagers;
+                    }
                 }
 
                 setApprovers(potentialApprovers);
@@ -165,8 +193,31 @@ export default function ApplyLeavePage() {
         e.preventDefault();
         setLoading(true);
 
-        if (!selectedApproverId) {
-            toast.error("Please select an approver");
+        // If not admin, require approver
+        // We need to check role again or store it in state. 
+        // For simplicity, let's check if approvers list is empty AND we are not admin.
+        // Actually, better to just check if selectedApproverId is missing AND we have approvers to select from.
+        // But if we are admin, approvers list is empty intentionally.
+
+        // Let's fetch user role again or trust the state. 
+        // Since we don't have userRole in state, let's rely on the fact that if approvers is empty, 
+        // it might be admin OR no manager found.
+
+        // A better way: let's store isAutoApproved in state.
+        // But for now, let's just check:
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return; // Should handle auth better
+
+        // Quick role check (or we could have stored it in fetchData)
+        // To avoid another fetch, let's assume if approvers.length === 0, it might be an issue unless we know it's admin.
+        // Let's just proceed. The backend handles the "Admin" check for auto-approval.
+        // The only issue is if a normal user has 0 approvers, they can't submit because we blocked it?
+        // Or if we remove the block?
+
+        // Let's modify the block:
+        // Validation
+        if (userRole !== 'admin' && !selectedApproverId) {
+            toast.error(approvers.length === 0 ? "No approvers found. Please contact HR." : "Please select an approver");
             setLoading(false);
             return;
         }
@@ -289,34 +340,6 @@ export default function ApplyLeavePage() {
                             </Card>
                         ) : (
                             <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">New Application</CardTitle>
-                                    <CardDescription>
-                                        Requesting approval from:
-                                        {approvers.length > 1 ? (
-                                            <div className="mt-2">
-                                                <Select value={selectedApproverId} onValueChange={setSelectedApproverId}>
-                                                    <SelectTrigger className="w-full md:w-[300px]">
-                                                        <SelectValue placeholder="Select Approver" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {approvers.map(approver => (
-                                                            <SelectItem key={approver.id} value={approver.id}>
-                                                                {approver.full_name} • {approver.department || 'General'} Manager
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                        ) : (
-                                            <span className="font-medium text-slate-900 ml-1">
-                                                {approvers.length === 1
-                                                    ? `${approvers[0].full_name} • ${approvers[0].department || 'General'} Manager`
-                                                    : "No approver found"}
-                                            </span>
-                                        )}
-                                    </CardDescription>
-                                </CardHeader>
                                 <CardContent>
                                     <form onSubmit={handleSubmit} className="space-y-6">
 
@@ -418,6 +441,39 @@ export default function ApplyLeavePage() {
                                                 })()
                                             )
                                         }
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="approver">Approver</Label>
+                                            {userRole === 'admin' ? (
+                                                <div className="flex items-center gap-2 p-3 bg-slate-50 border rounded-md text-sm text-slate-600">
+                                                    <CheckCircle className="h-4 w-4 text-emerald-500" />
+                                                    <span>System (Auto-Approval)</span>
+                                                </div>
+                                            ) : approvers.length > 0 ? (
+                                                <Select value={selectedApproverId} onValueChange={setSelectedApproverId} required>
+                                                    <SelectTrigger id="approver">
+                                                        <SelectValue placeholder="Select approver" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {approvers.map((approver) => (
+                                                            <SelectItem key={approver.id} value={approver.id}>
+                                                                <div className="flex flex-col items-start text-left">
+                                                                    <span className="font-medium">{approver.full_name}</span>
+                                                                    <span className="text-xs text-slate-500">
+                                                                        {approver.designation || approver.role.toUpperCase()}
+                                                                    </span>
+                                                                </div>
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            ) : (
+                                                <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-700">
+                                                    <AlertCircle className="h-4 w-4" />
+                                                    <span>No approvers found. Please contact HR.</span>
+                                                </div>
+                                            )}
+                                        </div>
 
                                         <div className="space-y-2">
                                             <Label htmlFor="reason">Reason</Label>
