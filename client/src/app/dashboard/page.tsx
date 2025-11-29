@@ -278,9 +278,7 @@ export default function DashboardPage() {
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
         <DashboardHeader title={getDashboardTitle()} />
 
-        <BirthdaySlider />
-
-        <section className="grid gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+        <section className="grid gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] mb-6">
           {/* Today's status */}
           <Card>
             <CardHeader className="pb-3">
@@ -401,7 +399,7 @@ export default function DashboardPage() {
         </section>
 
         {commonInfo && (
-          <div className="mt-6">
+          <div className="mb-6">
             <Card className="overflow-hidden border-l-4 border-l-indigo-500 shadow-sm transition-all hover:shadow-md">
               <CardHeader className="bg-slate-50/50 pb-3 pt-4">
                 <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-900">
@@ -419,6 +417,10 @@ export default function DashboardPage() {
             </Card>
           </div>
         )}
+
+        <BirthdaySlider role={role} />
+
+
       </div>
     </AppShell>
   );

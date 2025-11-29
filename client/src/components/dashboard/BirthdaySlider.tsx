@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/utils/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { format, getMonth, getDate, intervalToDuration, isToday, parseISO, isSameMonth } from "date-fns";
+import { format, intervalToDuration, isSameDay, parseISO, addDays, setYear, getYear, isBefore, isAfter, startOfDay, differenceInDays } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { Cake, ChevronLeft, ChevronRight, PartyPopper } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,82 +15,121 @@ type BirthdayUser = {
     avatar_url: string | null;
     role: string;
     designation: string | null;
+    department: string | null;
     date_of_joining: string | null;
     dob: string;
+    nextBirthday: Date;
 };
 
-export function BirthdaySlider() {
+export function BirthdaySlider({ role }: { role: string }) {
     const [enabled, setEnabled] = useState(false);
     const [users, setUsers] = useState<BirthdayUser[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
     useEffect(() => {
         checkFeatureAndFetchData();
-    }, []);
+    }, [role]);
 
     const checkFeatureAndFetchData = async () => {
         try {
-            // 1. Check if feature is enabled
-            const { data: setting } = await supabase
-                .from('system_settings')
-                .select('value')
-                .eq('key', 'birthday_feature_enabled')
-                .maybeSingle();
+            // 0. Get Current User ID
+            const { data: { user: authUser } } = await supabase.auth.getUser();
+            setCurrentUserId(authUser?.id || null);
 
-            if (!setting || setting.value !== 'true') {
+            // 1. Check if feature is enabled
+            let featureEnabled = true;
+
+            if (role === 'employee') {
+                const { data: setting } = await supabase
+                    .from('system_settings')
+                    .select('value')
+                    .eq('key', 'birthday_feature_enabled')
+                    .maybeSingle();
+
+                if (!setting || setting.value !== 'true') {
+                    featureEnabled = false;
+                }
+            }
+
+            if (!featureEnabled) {
                 setLoading(false);
                 return;
             }
 
             setEnabled(true);
 
-            // 2. Fetch profiles and user_details
-            const { data: profiles } = await supabase
-                .from('profiles')
-                .select('id, full_name, avatar_url, role, designation, date_of_joining');
+            // 2. Fetch data using RPC to bypass RLS
+            // The 'get_all_birthdays' function must be created in Supabase first
+            const { data: allUsers, error } = await supabase
+                .rpc('get_all_birthdays');
 
-            const { data: details } = await supabase
-                .from('user_details')
-                .select('id, dob');
+            if (error) {
+                console.error("Error fetching birthdays via RPC:", error);
+                // Fallback or just return (if function doesn't exist, this will error)
+                setLoading(false);
+                return;
+            }
 
-            if (!profiles || !details) return;
+            if (!allUsers) return;
 
-            // 3. Merge and Filter
-            const currentMonth = getMonth(new Date());
-            const today = new Date();
+            // 3. Filter and Process (Next 7 Days)
+            const today = startOfDay(new Date());
+            const windowEnd = addDays(today, 7);
+            const currentYear = getYear(today);
 
-            const birthdayUsers = profiles
-                .map(profile => {
-                    const detail = details.find(d => d.id === profile.id);
-                    return { ...profile, dob: detail?.dob };
-                })
-                .filter(user => {
-                    if (!user.dob) return false;
+            console.log("--- Birthday Debug (RPC) ---");
+            console.log("Today:", format(today, 'yyyy-MM-dd'));
+            console.log("Window End:", format(windowEnd, 'yyyy-MM-dd'));
+
+            const birthdayUsers = (allUsers as any[])
+                .map(user => {
+                    if (!user.dob) return null;
+
                     const dobDate = parseISO(user.dob);
-                    return getMonth(dobDate) === currentMonth;
+
+                    // Calculate next birthday
+                    let nextBirthday = setYear(dobDate, currentYear);
+                    // If birthday has passed this year (strictly before today), set to next year
+                    if (isBefore(nextBirthday, today)) {
+                        nextBirthday = setYear(dobDate, currentYear + 1);
+                    }
+
+                    return {
+                        id: user.id,
+                        full_name: user.full_name,
+                        avatar_url: user.avatar_url,
+                        role: user.role,
+                        designation: user.designation,
+                        department: user.department,
+                        date_of_joining: user.date_of_joining,
+                        dob: user.dob,
+                        nextBirthday
+                    };
                 })
-                .map(user => user as BirthdayUser)
+                .filter((user): user is BirthdayUser => {
+                    if (!user) return false;
+
+                    // Check if next birthday is within the window [today, today + 7]
+                    // We use isSameDay to be inclusive of the start and end dates
+                    const isAfterOrSameToday = isAfter(user.nextBirthday, today) || isSameDay(user.nextBirthday, today);
+                    const isBeforeOrSameEnd = isBefore(user.nextBirthday, windowEnd) || isSameDay(user.nextBirthday, windowEnd);
+
+                    const isWithinWindow = isAfterOrSameToday && isBeforeOrSameEnd;
+
+                    if (isWithinWindow) {
+                        console.log(`User ${user.full_name}: Next Birthday ${format(user.nextBirthday, 'yyyy-MM-dd')} (IN WINDOW)`);
+                    }
+
+                    return isWithinWindow;
+                })
                 .sort((a, b) => {
-                    // Sort by day of month
-                    const dayA = getDate(parseISO(a.dob));
-                    const dayB = getDate(parseISO(b.dob));
-
-                    // If today is one of them, prioritize today
-                    const isTodayA = isToday(new Date(new Date().getFullYear(), getMonth(parseISO(a.dob)), dayA));
-                    const isTodayB = isToday(new Date(new Date().getFullYear(), getMonth(parseISO(b.dob)), dayB));
-
-                    if (isTodayA && !isTodayB) return -1;
-                    if (!isTodayA && isTodayB) return 1;
-
-                    // Otherwise sort by upcoming days
-                    const currentDay = getDate(today);
-                    if (dayA >= currentDay && dayB < currentDay) return -1;
-                    if (dayA < currentDay && dayB >= currentDay) return 1;
-
-                    return dayA - dayB;
+                    // Sort by next birthday (earliest first)
+                    return a.nextBirthday.getTime() - b.nextBirthday.getTime();
                 });
 
+            console.log("Total Upcoming Birthdays:", birthdayUsers.length);
             setUsers(birthdayUsers);
         } catch (error) {
             console.error("Error fetching birthday data:", error);
@@ -107,13 +146,38 @@ export function BirthdaySlider() {
         setCurrentIndex((prev) => (prev - 1 + users.length) % users.length);
     };
 
-    if (loading || !enabled || users.length === 0) return null;
+    if (loading || !enabled) return null;
+
+    if (users.length === 0) {
+        return (
+            <div className="mb-6">
+                <Card className="border-dashed border-slate-300 shadow-sm bg-slate-50/50">
+                    <CardContent className="flex flex-col items-center justify-center p-6 text-center text-slate-500">
+                        <Cake className="h-8 w-8 mb-2 text-slate-300" />
+                        <p className="text-sm font-medium">No upcoming birthdays</p>
+                        <p className="text-xs text-slate-400">Birthdays in the next 7 days will appear here.</p>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
 
     const currentUser = users[currentIndex];
-    const dobDate = parseISO(currentUser.dob);
-    // Construct current year birthday to check if it is today
-    const currentYearBirthday = new Date(new Date().getFullYear(), getMonth(dobDate), getDate(dobDate));
-    const isBirthdayToday = isToday(currentYearBirthday);
+    const isBirthdayToday = isSameDay(currentUser.nextBirthday, new Date());
+    const isMyBirthday = currentUser.id === currentUserId;
+
+    // Relative Date Logic
+    const getRelativeDate = (date: Date) => {
+        const today = startOfDay(new Date());
+        const diff = differenceInDays(date, today);
+
+        if (diff === 0) return "Today";
+        if (diff === 1) return "Tomorrow";
+        if (diff < 7) return format(date, 'EEEE'); // Day name (e.g., "Monday")
+        return format(date, 'MMMM do'); // "October 15th"
+    };
+
+    const relativeDate = getRelativeDate(currentUser.nextBirthday);
 
     const timeInCompany = currentUser.date_of_joining ? (() => {
         const duration = intervalToDuration({
@@ -133,7 +197,7 @@ export function BirthdaySlider() {
                     {/* Header / Title */}
                     <div className="absolute top-4 left-4 z-10 flex items-center gap-2 text-xs font-medium text-slate-500 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-full">
                         <Cake className="h-3.5 w-3.5 text-pink-500" />
-                        Birthdays this Month
+                        Upcoming Birthdays
                     </div>
 
                     {/* Navigation Buttons */}
@@ -172,7 +236,10 @@ export function BirthdaySlider() {
                                 <div className="relative">
                                     <div className={`rounded-full p-1 ${isBirthdayToday ? 'bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500' : 'bg-slate-100'}`}>
                                         <Avatar className="h-20 w-20 sm:h-24 sm:w-24 border-2 border-white">
-                                            <AvatarImage src={currentUser.avatar_url || undefined} className="object-cover" />
+                                            <AvatarImage
+                                                src={(currentUser.avatar_url && currentUser.avatar_url !== "NULL" && currentUser.avatar_url !== "null") ? currentUser.avatar_url : undefined}
+                                                className="object-cover"
+                                            />
                                             <AvatarFallback className="text-lg bg-slate-200">
                                                 {currentUser.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                                             </AvatarFallback>
@@ -193,7 +260,7 @@ export function BirthdaySlider() {
                                 <div className="text-center sm:text-left flex-1">
                                     {isBirthdayToday && (
                                         <p className="text-pink-600 font-bold text-sm mb-1 animate-pulse">
-                                            🎉 Happy Birthday!
+                                            🎉 {isMyBirthday ? "Happy Birthday to You!" : `Happy Birthday, ${currentUser.full_name.split(' ')[0]}!`}
                                         </p>
                                     )}
                                     <h3 className="text-xl font-bold text-slate-900">{currentUser.full_name}</h3>
@@ -202,19 +269,21 @@ export function BirthdaySlider() {
                                             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
                                             {currentUser.designation || currentUser.role}
                                         </span>
+                                        {currentUser.department && (
+                                            <span className="flex items-center gap-1.5">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                                {currentUser.department}
+                                            </span>
+                                        )}
                                         <span className="flex items-center gap-1.5">
                                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                                             {timeInCompany} at company
                                         </span>
-                                        <span className="flex items-center gap-1.5">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                                            Joined {currentUser.date_of_joining ? format(parseISO(currentUser.date_of_joining), 'MMM yyyy') : 'N/A'}
-                                        </span>
                                     </div>
 
                                     <div className="mt-4 flex items-center justify-center sm:justify-start gap-2">
-                                        <div className="text-xs font-medium px-2.5 py-1 rounded-md bg-slate-100 text-slate-600">
-                                            Birthday: {format(dobDate, 'MMMM do')}
+                                        <div className={`text-xs font-medium px-2.5 py-1 rounded-md ${isBirthdayToday ? 'bg-pink-100 text-pink-700' : 'bg-slate-100 text-slate-600'}`}>
+                                            {relativeDate} • {format(currentUser.nextBirthday, 'MMMM do')}
                                         </div>
                                     </div>
                                 </div>
