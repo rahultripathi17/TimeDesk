@@ -58,7 +58,6 @@ const employeeExtra: NavItem[] = [
   },
 ];
 const managerExtra: NavItem[] = [
-  { label: "Team Overview", href: "/manager", icon: Users },
   { label: "Team Attendance", href: "/manager/attendance", icon: CalendarDays },
   {
     label: "Leaves",
@@ -71,7 +70,6 @@ const managerExtra: NavItem[] = [
 ];
 
 const hrExtra: NavItem[] = [
-  { label: "Company Overview", href: "/hr", icon: LayoutDashboard },
   { label: "All Attendance", href: "/hr/attendance", icon: CalendarDays },
   { label: "Teams & Depts", href: "/hr/teams", icon: Users },
   { label: "Reports", href: "/hr/reports", icon: FileSpreadsheet },
@@ -79,7 +77,6 @@ const hrExtra: NavItem[] = [
 ];
 
 const adminExtra: NavItem[] = [
-  { label: "Admin Home", href: "/admin", icon: LayoutDashboard, exact: true },
   { label: "Users & Roles", href: "/admin/users", icon: Users, exact: true },
   { label: "Add New User", href: "/admin/users/new", icon: UserPlus, exact: true },
   { label: "Departments", href: "/admin/departments", icon: Users },
@@ -101,17 +98,11 @@ export function navForRole(role: Role): NavItem[] {
     case "employee":
       return [...baseItems, ...employeeExtra];
     case "manager":
-      return managerExtra.map(item =>
-        item.label === "Team Overview" ? { ...item, label: "Home" } : item
-      );
+      return [...baseItems, ...managerExtra];
     case "hr":
-      return hrExtra.map(item =>
-        item.label === "Company Overview" ? { ...item, label: "Home" } : item
-      );
+      return [...baseItems, ...hrExtra];
     case "admin":
-      return adminExtra.map(item =>
-        item.label === "Admin Home" ? { ...item, label: "Home" } : item
-      );
+      return [...baseItems, ...adminExtra];
     default:
       return baseItems;
   }

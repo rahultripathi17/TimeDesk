@@ -17,15 +17,18 @@ import { supabase } from "@/utils/supabase/client";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { useRouter } from "next/navigation";
 
-export default function EmployeeDashboardPage() {
+export default function DashboardPage() {
   const [status, setStatus] = useState<"available" | "remote" | "leave" | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<"available" | "remote" | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchedDate, setFetchedDate] = useState<string | null>(null);
   const [commonInfo, setCommonInfo] = useState<string | null>(null);
+  const [role, setRole] = useState<"employee" | "manager" | "hr" | "admin">("employee");
+  const [roleLoading, setRoleLoading] = useState(true);
 
   useEffect(() => {
+    fetchUserRole();
     fetchTodayStatus();
     fetchCommonInfo();
 
@@ -51,6 +54,27 @@ export default function EmployeeDashboardPage() {
       window.removeEventListener('focus', handleFocus);
     };
   }, [fetchedDate]);
+
+  const fetchUserRole = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      if (profile) {
+        setRole(profile.role);
+      }
+    } catch (error) {
+      console.error("Error fetching user role:", error);
+    } finally {
+      setRoleLoading(false);
+    }
+  };
 
   const fetchCommonInfo = async () => {
     try {
@@ -232,10 +256,23 @@ export default function EmployeeDashboardPage() {
   const currentStatus = getStatusDisplay();
   const StatusIcon = currentStatus.icon;
 
+  const getDashboardTitle = () => {
+    switch (role) {
+      case "admin": return "Admin Dashboard";
+      case "manager": return "Manager Dashboard";
+      case "hr": return "HR Dashboard";
+      default: return "My Dashboard";
+    }
+  };
+
+  if (roleLoading) {
+    return null; // Or a loading spinner
+  }
+
   return (
-    <AppShell role="employee">
+    <AppShell role={role}>
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
-        <DashboardHeader title="My Dashboard" />
+        <DashboardHeader title={getDashboardTitle()} />
 
         <section className="grid gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
           {/* Today's status */}
