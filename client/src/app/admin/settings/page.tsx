@@ -9,8 +9,13 @@ import { supabase } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import { Settings, Save } from "lucide-react";
 
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Cake } from "lucide-react";
+
 export default function AdminSettingsPage() {
     const [commonInfo, setCommonInfo] = useState("");
+    const [birthdayEnabled, setBirthdayEnabled] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -20,16 +25,23 @@ export default function AdminSettingsPage() {
 
     const fetchSettings = async () => {
         try {
-            const { data, error } = await supabase
+            const { data: commonData } = await supabase
                 .from('system_settings')
                 .select('value')
                 .eq('key', 'common_info')
                 .maybeSingle();
 
-            if (error) throw error;
+            const { data: birthdayData } = await supabase
+                .from('system_settings')
+                .select('value')
+                .eq('key', 'birthday_feature_enabled')
+                .maybeSingle();
 
-            if (data) {
-                setCommonInfo(data.value);
+            if (commonData) {
+                setCommonInfo(commonData.value);
+            }
+            if (birthdayData) {
+                setBirthdayEnabled(birthdayData.value === 'true');
             }
         } catch (error) {
             console.error('Error fetching settings:', error);
@@ -61,10 +73,30 @@ export default function AdminSettingsPage() {
         }
     };
 
+    const handleBirthdayToggle = async (checked: boolean) => {
+        setBirthdayEnabled(checked);
+        try {
+            const { error } = await supabase
+                .from('system_settings')
+                .upsert({
+                    key: 'birthday_feature_enabled',
+                    value: String(checked),
+                    updated_at: new Date().toISOString()
+                });
+
+            if (error) throw error;
+            toast.success(`Birthday slider ${checked ? 'enabled' : 'disabled'}`);
+        } catch (error: any) {
+            console.error('Error updating birthday setting:', error);
+            toast.error("Failed to update setting");
+            setBirthdayEnabled(!checked); // Revert on error
+        }
+    };
+
     return (
         <AppShell role="admin">
-            <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:py-8">
-                <header className="mb-6">
+            <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:py-8 space-y-6">
+                <header>
                     <h1 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
                         <Settings className="h-5 w-5 text-slate-500" />
                         Notice Board Management
@@ -99,6 +131,33 @@ export default function AdminSettingsPage() {
                                 <Save className="h-4 w-4" />
                                 {saving ? "Saving..." : "Save Changes"}
                             </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2">
+                            <Cake className="h-4 w-4 text-pink-500" />
+                            Feature Settings
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                            Enable or disable additional dashboard features.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                                <Label className="text-base">Birthday Slider</Label>
+                                <p className="text-xs text-slate-500">
+                                    Show upcoming birthdays on the dashboard for all employees.
+                                </p>
+                            </div>
+                            <Switch
+                                checked={birthdayEnabled}
+                                onCheckedChange={handleBirthdayToggle}
+                                disabled={loading}
+                            />
                         </div>
                     </CardContent>
                 </Card>

@@ -17,6 +17,8 @@ import { supabase } from "@/utils/supabase/client";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { useRouter } from "next/navigation";
 
+import { BirthdaySlider } from "@/components/dashboard/BirthdaySlider";
+
 export default function DashboardPage() {
   const [status, setStatus] = useState<"available" | "remote" | "leave" | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<"available" | "remote" | null>(null);
@@ -269,10 +271,14 @@ export default function DashboardPage() {
     return null; // Or a loading spinner
   }
 
+
+
   return (
     <AppShell role={role}>
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
         <DashboardHeader title={getDashboardTitle()} />
+
+        <BirthdaySlider />
 
         <section className="grid gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
           {/* Today's status */}
