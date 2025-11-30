@@ -182,3 +182,15 @@ create policy "Only admins can update system settings."
 insert into public.system_settings (key, value)
 values ('leave_reset_date', '2024-01-01')
 on conflict (key) do nothing;
+
+-- 7. Add work_config to profiles
+alter table public.profiles 
+add column if not exists work_config jsonb;
+
+-- 8. Add employment_type to profiles
+alter table public.profiles
+add column if not exists employment_type text check (employment_type in ('full_time', 'part_time', 'intern'));
+
+-- 9. Add salary to user_details
+alter table public.user_details
+add column if not exists salary numeric;

@@ -12,6 +12,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useState } from "react";
 import { Check, ChevronsUpDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -86,7 +87,26 @@ function AddUserForm() {
     const [ifsc, setIfsc] = useState("");
     // Username is now same as email
     const [role, setRole] = useState("");
+    const [employmentType, setEmploymentType] = useState("");
+    const [salary, setSalary] = useState("");
     const [designation, setDesignation] = useState("");
+
+    // Working Time Configuration State
+    const [workMode, setWorkMode] = useState<"fixed" | "flexible">("fixed");
+    // Fixed Mode
+    const [fixedStartTime, setFixedStartTime] = useState("09:00");
+    const [fixedEndTime, setFixedEndTime] = useState("17:00");
+    const [fixedWorkDays, setFixedWorkDays] = useState<number[]>([1, 2, 3, 4, 5]); // Mon-Fri default
+    // Flexible Mode
+    const [flexibleDailyHours, setFlexibleDailyHours] = useState("5");
+
+    const toggleWorkDay = (dayIndex: number) => {
+        setFixedWorkDays(prev =>
+            prev.includes(dayIndex)
+                ? prev.filter(d => d !== dayIndex)
+                : [...prev, dayIndex].sort()
+        );
+    };
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -153,16 +173,31 @@ function AddUserForm() {
             setFullName(data.full_name || "");
             setEmail(data.email || ""); // This now comes from Auth
             setRole(data.role || "");
+            setEmploymentType(data.employment_type || "");
             setDesignation(data.designation || "");
             setDepartment(data.department || "");
             setDoj(data.date_of_joining || "");
             setSelectedManagers(data.reporting_managers || []);
             setProfilePic(data.avatar_url || null);
 
+            // Populate Work Config
+            if (data.work_config) {
+                setWorkMode(data.work_config.mode || "fixed");
+                if (data.work_config.fixed) {
+                    setFixedStartTime(data.work_config.fixed.start_time || "09:00");
+                    setFixedEndTime(data.work_config.fixed.end_time || "17:00");
+                    setFixedWorkDays(data.work_config.fixed.work_days || [1, 2, 3, 4, 5]);
+                }
+                if (data.work_config.flexible) {
+                    setFlexibleDailyHours(data.work_config.flexible.daily_hours?.toString() || "5");
+                }
+            }
+
             const details = data.details;
             if (details) {
                 setPersonalEmail(details.personal_email || "");
                 setPhone(details.phone_number || "");
+                setSalary(details.salary?.toString() || "");
                 setGender(details.gender || "");
                 setDob(details.dob ? new Date(details.dob) : undefined);
                 setAddress(details.address || "");
@@ -243,6 +278,7 @@ function AddUserForm() {
                 // Identity
                 pan,
                 aadhaar,
+                salary: salary ? parseFloat(salary) : null,
 
                 // Employment
                 dateOfJoining: doj,
@@ -258,10 +294,21 @@ function AddUserForm() {
                 password: (document.getElementById('password') as HTMLInputElement).value, // Password is special, only send if changed
 
                 // Role
-                // Fix: Default to 'employee' if empty or invalid
                 role: role && role !== "select role" ? role : "employee",
+                employmentType: employmentType && employmentType !== "select type" ? employmentType : "full_time",
                 designation,
-                reportingManagers: selectedManagers
+                reportingManagers: selectedManagers,
+                workConfig: {
+                    mode: workMode,
+                    fixed: workMode === 'fixed' ? {
+                        start_time: fixedStartTime,
+                        end_time: fixedEndTime,
+                        work_days: fixedWorkDays
+                    } : undefined,
+                    flexible: workMode === 'flexible' ? {
+                        daily_hours: parseInt(flexibleDailyHours) || 5
+                    } : undefined
+                }
             };
 
             // Basic Validation
@@ -625,6 +672,33 @@ function AddUserForm() {
                                         </Select>
                                     </div>
                                     <div className="space-y-2">
+                                        <Label htmlFor="employmentType" className="text-xs font-medium">
+                                            Employment Type <span className="text-red-500">*</span>
+                                        </Label>
+                                        <Select value={employmentType} onValueChange={setEmploymentType}>
+                                            <SelectTrigger id="employmentType">
+                                                <SelectValue placeholder="Select type" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="full_time">Full Time</SelectItem>
+                                                <SelectItem value="part_time">Part Time</SelectItem>
+                                                <SelectItem value="intern">Intern</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="salary" className="text-xs font-medium">
+                                            Salary / CTC
+                                        </Label>
+                                        <Input
+                                            id="salary"
+                                            type="number"
+                                            placeholder="e.g. 50000"
+                                            value={salary}
+                                            onChange={(e) => setSalary(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
                                         <Label htmlFor="designation" className="text-xs font-medium">
                                             Designation
                                         </Label>
@@ -709,6 +783,112 @@ function AddUserForm() {
                                             Leave approval requests will be sent to these managers.
                                         </p>
                                     </div>
+                                </div>
+                            </div>
+
+                            {/* Working Time Configuration */}
+                            <div className="space-y-4">
+                                <h3 className="text-sm font-medium text-slate-900 border-b pb-2">
+                                    Working Time Configuration
+                                </h3>
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-medium">Work Mode</Label>
+                                        <RadioGroup
+                                            value={workMode}
+                                            onValueChange={(val) => setWorkMode(val as "fixed" | "flexible")}
+                                            className="flex gap-4"
+                                        >
+                                            <div className="flex items-center space-x-2">
+                                                <RadioGroupItem value="fixed" id="mode-fixed" />
+                                                <Label htmlFor="mode-fixed" className="text-sm font-normal">Fixed Shift (e.g. 9am - 5pm)</Label>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <RadioGroupItem value="flexible" id="mode-flexible" />
+                                                <Label htmlFor="mode-flexible" className="text-sm font-normal">Flexible / Part-time</Label>
+                                            </div>
+                                        </RadioGroup>
+                                    </div>
+
+                                    {workMode === "fixed" && (
+                                        <div className="grid gap-4 md:grid-cols-2 bg-slate-50 p-4 rounded-md border">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="startTime" className="text-xs font-medium">Start Time</Label>
+                                                <Input
+                                                    id="startTime"
+                                                    type="time"
+                                                    value={fixedStartTime}
+                                                    onChange={(e) => setFixedStartTime(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="endTime" className="text-xs font-medium">End Time</Label>
+                                                <Input
+                                                    id="endTime"
+                                                    type="time"
+                                                    value={fixedEndTime}
+                                                    onChange={(e) => setFixedEndTime(e.target.value)}
+                                                />
+                                            </div>
+
+                                            {/* Total Hours Display */}
+                                            <div className="md:col-span-2 text-xs text-slate-500 font-medium">
+                                                Total Duration: <span className="text-slate-900">
+                                                    {(() => {
+                                                        if (!fixedStartTime || !fixedEndTime) return "0h 0m";
+                                                        const [startH, startM] = fixedStartTime.split(':').map(Number);
+                                                        const [endH, endM] = fixedEndTime.split(':').map(Number);
+                                                        let diffM = (endH * 60 + endM) - (startH * 60 + startM);
+                                                        if (diffM < 0) diffM += 24 * 60; // Handle overnight shifts
+                                                        const hours = Math.floor(diffM / 60);
+                                                        const minutes = diffM % 60;
+                                                        return `${hours}h ${minutes}m`;
+                                                    })()}
+                                                </span>
+                                            </div>
+
+                                            <div className="space-y-2 md:col-span-2">
+                                                <Label className="text-xs font-medium block mb-2">Working Days</Label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, index) => (
+                                                        <div
+                                                            key={day}
+                                                            onClick={() => toggleWorkDay(index)}
+                                                            className={cn(
+                                                                "px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer border transition-colors",
+                                                                fixedWorkDays.includes(index)
+                                                                    ? "bg-slate-900 text-white border-slate-900"
+                                                                    : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+                                                            )}
+                                                        >
+                                                            {day}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <p className="text-[10px] text-slate-500 mt-1">Select the days the employee is expected to work.</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {workMode === "flexible" && (
+                                        <div className="bg-slate-50 p-4 rounded-md border">
+                                            <div className="space-y-2 max-w-xs">
+                                                <Label htmlFor="dailyHours" className="text-xs font-medium">Daily Working Hours</Label>
+                                                <div className="flex items-center gap-2">
+                                                    <Input
+                                                        id="dailyHours"
+                                                        type="number"
+                                                        min="1"
+                                                        max="24"
+                                                        value={flexibleDailyHours}
+                                                        onChange={(e) => setFlexibleDailyHours(e.target.value)}
+                                                    />
+                                                    <span className="text-sm text-slate-500">Hours</span>
+                                                </div>
+                                                <p className="text-[10px] text-slate-500">Employee can work these hours at any time during the day.</p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

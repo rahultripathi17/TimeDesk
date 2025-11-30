@@ -70,12 +70,14 @@ export async function POST(request: Request) {
             password,
             fullName,
             role,
+            employmentType,
             designation,
             department,
             dateOfJoining,
             reportingManagers,
             personalEmail,
             phone,
+            salary,
             gender,
             dob,
             address,
@@ -130,11 +132,13 @@ export async function POST(request: Request) {
                 username: username, // Using username or email as username
                 full_name: fullName,
                 role: role,
+                employment_type: employmentType,
                 designation: designation,
                 department: department,
                 date_of_joining: dateOfJoining,
                 reporting_managers: reportingManagers, // Array of UUIDs
-                avatar_url: avatarUrl
+                avatar_url: avatarUrl,
+                work_config: body.workConfig
             });
 
         if (profileError) {
@@ -151,6 +155,7 @@ export async function POST(request: Request) {
                 id: userId,
                 personal_email: personalEmail,
                 phone_number: phone,
+                salary: salary,
                 gender: gender,
                 dob: dob,
                 address: address,
@@ -188,12 +193,14 @@ export async function PUT(request: Request) {
             password,
             fullName,
             role,
+            employmentType,
             designation,
             department,
             dateOfJoining,
             reportingManagers,
             personalEmail,
             phone,
+            salary,
             gender,
             dob,
             address,
@@ -251,11 +258,13 @@ export async function PUT(request: Request) {
                 username: username,
                 full_name: fullName,
                 role: role,
+                employment_type: employmentType,
                 designation: designation,
                 department: department,
                 date_of_joining: dateOfJoining,
                 reporting_managers: reportingManagers,
-                avatar_url: avatarUrl
+                avatar_url: avatarUrl,
+                work_config: body.workConfig
             })
             .eq('id', userId);
 
@@ -271,6 +280,7 @@ export async function PUT(request: Request) {
                 id: userId,
                 personal_email: personalEmail,
                 phone_number: phone,
+                salary: salary,
                 gender: gender,
                 dob: dob,
                 address: address,
