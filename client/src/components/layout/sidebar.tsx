@@ -47,6 +47,7 @@ const baseItems: NavItem[] = [
 
 const employeeExtra: NavItem[] = [
   { label: "My Attendance", href: "/dashboard/attendance", icon: CalendarDays },
+  { label: "Team Attendance", href: "/employee/team", icon: Users },
   {
     label: "Leaves",
     href: "/leaves/apply",
@@ -91,7 +92,6 @@ const hrExtra: NavItem[] = [
 ];
 
 const adminExtra: NavItem[] = [
-  { label: "My Attendance", href: "/dashboard/attendance", icon: CalendarDays },
   { label: "Users & Roles", href: "/admin/users", icon: Users, exact: true },
   { label: "Add New User", href: "/admin/users/new", icon: UserPlus, exact: true },
   { label: "Departments", href: "/admin/departments", icon: Users },
@@ -101,8 +101,6 @@ const adminExtra: NavItem[] = [
     href: "/admin/leaves",
     icon: FileSpreadsheet,
     children: [
-      { label: "Apply Leave", href: "/leaves/apply", icon: FileSpreadsheet },
-      { label: "Leave Balance", href: "/leaves/balance", icon: FileSpreadsheet },
       { label: "Limits", href: "/admin/leaves/limits", icon: ShieldCheck },
       { label: "Approvals", href: "/admin/leaves", icon: FileSpreadsheet, exact: true },
       { label: "Reset Balances", href: "/admin/leaves/reset", icon: FileSpreadsheet },

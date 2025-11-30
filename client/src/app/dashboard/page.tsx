@@ -278,125 +278,127 @@ export default function DashboardPage() {
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
         <DashboardHeader title={getDashboardTitle()} />
 
-        <section className="grid gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] mb-6">
-          {/* Today's status */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Home className="h-5 w-5" />
-                Today&apos;s Status
-              </CardTitle>
-              <CardDescription className="text-xs">
-                View or update your work location.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className={`flex items-center justify-between rounded-xl border px-4 py-3 text-xs ${currentStatus.bgColor} ${currentStatus.borderColor}`}>
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-slate-500">
-                    Current
-                  </p>
-                  <p className={`mt-1 flex items-center gap-1.5 text-sm font-semibold ${currentStatus.color}`}>
-                    <StatusIcon className="h-4 w-4" />
-                    {currentStatus.label}
-                  </p>
-                </div>
-                {lastUpdated && (
-                  <span className="text-[11px] text-slate-400">
-                    Last updated {lastUpdated}
-                  </span>
-                )}
-              </div>
-
-              {!status && (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    <Button
-                      variant={selectedStatus === "available" ? "default" : "outline"}
-                      className={cn(
-                        "justify-start transition-all",
-                        selectedStatus === "available" ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600" : "hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
-                      )}
-                      onClick={() => handleStatusSelect("available")}
-                      disabled={loading}
-                    >
-                      <Home className="mr-2 h-4 w-4" />
-                      Office
-                    </Button>
-                    <Button
-                      variant={selectedStatus === "remote" ? "default" : "outline"}
-                      className={cn(
-                        "justify-start transition-all",
-                        selectedStatus === "remote" ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600" : "hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-                      )}
-                      onClick={() => handleStatusSelect("remote")}
-                      disabled={loading}
-                    >
-                      <Globe className="mr-2 h-4 w-4" />
-                      Remote
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="justify-start hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700"
-                      onClick={() => updateStatus("leave")}
-                      disabled={loading}
-                    >
-                      <Palmtree className="mr-2 h-4 w-4" />
-                      On leave
-                    </Button>
+        {role !== 'admin' && (
+          <section className="grid gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] mb-6">
+            {/* Today's status */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Home className="h-5 w-5" />
+                  Today&apos;s Status
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  View or update your work location.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className={`flex items-center justify-between rounded-xl border px-4 py-3 text-xs ${currentStatus.bgColor} ${currentStatus.borderColor}`}>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                      Current
+                    </p>
+                    <p className={`mt-1 flex items-center gap-1.5 text-sm font-semibold ${currentStatus.color}`}>
+                      <StatusIcon className="h-4 w-4" />
+                      {currentStatus.label}
+                    </p>
                   </div>
-
-                  {selectedStatus && (
-                    <div className="flex animate-in fade-in slide-in-from-top-2">
-                      <Button
-                        className="w-full gap-2 bg-slate-900 text-white hover:bg-slate-800"
-                        onClick={confirmStatus}
-                        disabled={loading}
-                      >
-                        <CheckCircle2 className="h-4 w-4" />
-                        Confirm & Mark Attendance
-                      </Button>
-                    </div>
+                  {lastUpdated && (
+                    <span className="text-[11px] text-slate-400">
+                      Last updated {lastUpdated}
+                    </span>
                   )}
                 </div>
-              )}
 
-              {status && (
-                <div className="rounded-lg bg-slate-50 p-4 text-center">
-                  <p className="text-xs text-slate-500 mb-1">Attendance marked for today</p>
-                  <p className="text-sm font-medium text-slate-900">You cannot change your status once marked.</p>
+                {!status && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <Button
+                        variant={selectedStatus === "available" ? "default" : "outline"}
+                        className={cn(
+                          "justify-start transition-all",
+                          selectedStatus === "available" ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600" : "hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+                        )}
+                        onClick={() => handleStatusSelect("available")}
+                        disabled={loading}
+                      >
+                        <Home className="mr-2 h-4 w-4" />
+                        Office
+                      </Button>
+                      <Button
+                        variant={selectedStatus === "remote" ? "default" : "outline"}
+                        className={cn(
+                          "justify-start transition-all",
+                          selectedStatus === "remote" ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600" : "hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                        )}
+                        onClick={() => handleStatusSelect("remote")}
+                        disabled={loading}
+                      >
+                        <Globe className="mr-2 h-4 w-4" />
+                        Remote
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="justify-start hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700"
+                        onClick={() => updateStatus("leave")}
+                        disabled={loading}
+                      >
+                        <Palmtree className="mr-2 h-4 w-4" />
+                        On leave
+                      </Button>
+                    </div>
+
+                    {selectedStatus && (
+                      <div className="flex animate-in fade-in slide-in-from-top-2">
+                        <Button
+                          className="w-full gap-2 bg-slate-900 text-white hover:bg-slate-800"
+                          onClick={confirmStatus}
+                          disabled={loading}
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                          Confirm & Mark Attendance
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {status && (
+                  <div className="rounded-lg bg-slate-50 p-4 text-center">
+                    <p className="text-xs text-slate-500 mb-1">Attendance marked for today</p>
+                    <p className="text-sm font-medium text-slate-900">You cannot change your status once marked.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Quick summary */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Clock className="h-5 w-5" />
+                  Last 7 days
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Quick snapshot of your week.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-3 gap-3 text-center text-xs">
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <p className="text-[11px] text-slate-500">Office</p>
+                  <p className="mt-1 text-lg font-semibold">3</p>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Quick summary */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Clock className="h-5 w-5" />
-                Last 7 days
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Quick snapshot of your week.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-3 gap-3 text-center text-xs">
-              <div className="rounded-xl bg-slate-50 p-3">
-                <p className="text-[11px] text-slate-500">Office</p>
-                <p className="mt-1 text-lg font-semibold">3</p>
-              </div>
-              <div className="rounded-xl bg-slate-50 p-3">
-                <p className="text-[11px] text-slate-500">WFH</p>
-                <p className="mt-1 text-lg font-semibold">2</p>
-              </div>
-              <div className="rounded-xl bg-slate-50 p-3">
-                <p className="text-[11px] text-slate-500">Leave</p>
-                <p className="mt-1 text-lg font-semibold">1</p>
-              </div>
-            </CardContent>
-          </Card>
-        </section>
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <p className="text-[11px] text-slate-500">WFH</p>
+                  <p className="mt-1 text-lg font-semibold">2</p>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <p className="text-[11px] text-slate-500">Leave</p>
+                  <p className="mt-1 text-lg font-semibold">1</p>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        )}
 
         {commonInfo && (
           <div className="mb-6">
