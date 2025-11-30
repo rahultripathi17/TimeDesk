@@ -25,7 +25,7 @@ import {
 import { useState, useEffect } from "react";
 import { supabase } from "@/utils/supabase/client";
 import { Pencil, Trash2, Plus, Loader2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 type Department = {
     name: string;
@@ -45,7 +45,7 @@ export default function DepartmentsPage() {
     const [editDepartmentName, setEditDepartmentName] = useState("");
 
     const [actionLoading, setActionLoading] = useState(false);
-    const { toast } = useToast();
+
 
     useEffect(() => {
         fetchDepartments();
@@ -101,11 +101,7 @@ export default function DepartmentsPage() {
             }
         } catch (err: any) {
             console.error("Error fetching departments:", err);
-            toast({
-                title: "Error",
-                description: "Failed to load departments.",
-                variant: "destructive",
-            });
+            toast.error("Failed to load departments.");
         } finally {
             setLoading(false);
         }
@@ -136,21 +132,14 @@ export default function DepartmentsPage() {
 
             if (error) throw error;
 
-            toast({
-                title: "Success",
-                description: "Department added successfully.",
-            });
+            toast.success("Department added successfully.");
             setIsAddDialogOpen(false);
             setNewDepartmentName("");
             fetchDepartments();
 
         } catch (err: any) {
             console.error("Error adding department:", err);
-            toast({
-                title: "Error",
-                description: err.message || "Failed to add department.",
-                variant: "destructive",
-            });
+            toast.error(err.message || "Failed to add department.");
         } finally {
             setActionLoading(false);
         }
@@ -178,20 +167,13 @@ export default function DepartmentsPage() {
 
             if (error) throw error;
 
-            toast({
-                title: "Success",
-                description: "Department updated successfully.",
-            });
+            toast.success("Department updated successfully.");
             setIsEditDialogOpen(false);
             fetchDepartments();
 
         } catch (err: any) {
             console.error("Error updating department:", err);
-            toast({
-                title: "Error",
-                description: err.message || "Failed to update department.",
-                variant: "destructive",
-            });
+            toast.error(err.message || "Failed to update department.");
         } finally {
             setActionLoading(false);
         }
@@ -209,20 +191,13 @@ export default function DepartmentsPage() {
 
             if (error) throw error;
 
-            toast({
-                title: "Success",
-                description: "Department deleted successfully.",
-            });
+            toast.success("Department deleted successfully.");
             setIsDeleteDialogOpen(false);
             fetchDepartments();
 
         } catch (err: any) {
             console.error("Error deleting department:", err);
-            toast({
-                title: "Error",
-                description: "Failed to delete department.",
-                variant: "destructive",
-            });
+            toast.error("Failed to delete department.");
         } finally {
             setActionLoading(false);
         }

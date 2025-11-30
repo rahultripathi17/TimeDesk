@@ -14,13 +14,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/utils/supabase/client";
+import { toast } from "sonner";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,16 +32,41 @@ export default function LoginPage() {
     setError(null);
 
     try {
+      // 1. Check if email exists first
+      const { data: userExists, error: rpcError } = await supabase
+        .rpc('check_user_exists', { email_input: email.trim() });
+
+      if (rpcError) {
+        console.error("RPC Error:", rpcError);
+        // Fallback to generic login if RPC fails (e.g. function missing)
+      } else if (userExists === false) {
+        const msg = "Email not found";
+        setError(msg);
+        toast.error(msg);
+        setLoading(false);
+        return;
+      }
+
+      // 2. Attempt Login
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (authError) {
-        throw new Error(authError.message);
+        let msg = authError.message;
+        if (authError.message === "Invalid login credentials") {
+          msg = "Incorrect password";
+        }
+        setError(msg);
+        toast.error(msg);
+        setLoading(false);
+        return;
       }
 
       if (authData.user) {
+        toast.success("Login successful! Redirecting...");
+
         // Fetch user profile to get role
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
@@ -49,7 +76,6 @@ export default function LoginPage() {
 
         if (profileError) {
           console.error("Error fetching profile:", profileError);
-          // Fallback or handle error. For now, redirect to dashboard as fallback.
           router.push("/dashboard");
           return;
         }
@@ -74,15 +100,16 @@ export default function LoginPage() {
         }
       }
     } catch (err: any) {
-      setError(err.message || "An error occurred during login");
-    } finally {
+      const msg = err.message || "An error occurred during login";
+      setError(msg);
+      toast.error(msg);
       setLoading(false);
     }
   };
 
   return (
     <main className="flex min-h-screen flex-col bg-slate-50">
-      {/* top logo bar with small padding so height stays compact */}
+      {/* top logo bar */}
       <header className="px-4 pt-4 sm:px-8 sm:pt-6">
         <div className="flex items-center gap-3">
           <Image
@@ -96,14 +123,14 @@ export default function LoginPage() {
         </div>
       </header>
 
-      {/* center card vertically; keep some padding but not too much */}
-      <div className="flex flex-1 items-center justify-center px-4 pb-6 pt-4 sm:px-8 sm:pb-8 sm:pt-4">
+      {/* center card */}
+      <div className="flex flex-1 items-center justify-center px-4 py-4 sm:px-8">
         <Card className="w-full max-w-5xl border-slate-200 bg-white shadow-xl">
           <CardContent className="p-4 sm:p-6 lg:p-8">
-            <div className="grid gap-6 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] md:items-center">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-center">
               {/* LEFT: login form */}
               <section>
-                <CardHeader className="px-0 pb-3">
+                <CardHeader className="px-0 pb-2">
                   <CardTitle className="text-2xl font-semibold text-slate-900 sm:text-3xl">
                     Hello there! <span className="align-middle">👋</span>
                   </CardTitle>
@@ -112,15 +139,16 @@ export default function LoginPage() {
                   </CardDescription>
                 </CardHeader>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-3">
                   {error && (
-                    <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">
+                    <div className="rounded-md bg-red-50 p-2.5 text-sm font-medium text-red-600 flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-red-600 flex-shrink-0" />
                       {error}
                     </div>
                   )}
 
-                  <div className="space-y-1.5">
-                    <Label htmlFor="email" className="text-xs">
+                  <div className="space-y-1">
+                    <Label htmlFor="email" className="text-xs font-medium text-slate-700">
                       Email Address
                     </Label>
                     <Input
@@ -130,14 +158,14 @@ export default function LoginPage() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      className="h-10"
+                      className="h-9 text-base sm:text-sm"
                       disabled={loading}
                     />
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     <div className="flex items-center justify-between text-xs">
-                      <Label htmlFor="password">Password</Label>
+                      <Label htmlFor="password" className="font-medium text-slate-700">Password</Label>
                       <Link
                         href="/forgot-password"
                         className="font-medium text-sky-600 hover:text-sky-500 hover:underline"
@@ -145,22 +173,36 @@ export default function LoginPage() {
                         Forgot password?
                       </Link>
                     </div>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      className="h-10"
-                      disabled={loading}
-                    />
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        className="h-9 pr-10 text-base sm:text-sm"
+                        disabled={loading}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                        tabIndex={-1}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   <Button
                     type="submit"
                     size="lg"
-                    className="mt-1 flex w-full items-center justify-center gap-2"
+                    className="mt-2 flex w-full items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white transition-all h-10"
                     disabled={loading}
                   >
                     {loading ? (
@@ -176,7 +218,7 @@ export default function LoginPage() {
                     )}
                   </Button>
 
-                  <p className="pt-2 text-[10px] leading-snug text-slate-500">
+                  <p className="pt-2 text-[10px] leading-snug text-slate-500 text-center">
                     By logging in, you agree to Hoora&apos;s{" "}
                     <span className="cursor-pointer text-sky-600 hover:underline">
                       Terms of Service
@@ -191,30 +233,40 @@ export default function LoginPage() {
               </section>
 
               {/* RIGHT: short text + big image */}
-              <section className="hidden h-full flex-col justify-between rounded-2xl bg-slate-50 p-5 md:flex">
+              <section className="hidden h-full flex-col justify-between rounded-2xl bg-slate-50 p-5 lg:flex">
                 <div>
-                  <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-700">
+                  <span className="inline-flex rounded-full bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-indigo-600 shadow-sm">
                     Attendance
                   </span>
 
-                  <h2 className="mt-3 text-lg font-semibold text-slate-900 sm:text-xl">
+                  <h2 className="mt-4 text-xl font-bold text-slate-900">
                     Simple daily check-ins.
                   </h2>
 
-                  <ul className="mt-3 space-y-1.5 text-xs text-slate-700 sm:text-sm">
-                    <li>• Mark status from Microsoft Teams</li>
-                    <li>• Quick leave approvals</li>
-                    <li>• Clean reports for HR</li>
+                  <ul className="mt-4 space-y-2 text-sm text-slate-600 font-medium">
+                    <li className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      Mark status from anywhere
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                      Quick leave approvals
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                      Clean reports for HR
+                    </li>
                   </ul>
                 </div>
 
-                <div className="mt-4 flex items-end justify-end">
+                <div className="mt-8 flex items-end justify-end">
                   <div className="relative h-52 w-full sm:h-60 md:h-64">
                     <Image
                       src="/storyset-login.svg"
                       alt="Hoora attendance illustration"
                       fill
-                      className="object-contain"
+                      className="object-contain drop-shadow-sm"
+                      priority
                     />
                   </div>
                 </div>
