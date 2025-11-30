@@ -79,10 +79,6 @@ export function BirthdaySlider({ role }: { role: string }) {
             const windowEnd = addDays(today, 7);
             const currentYear = getYear(today);
 
-            console.log("--- Birthday Debug (RPC) ---");
-            console.log("Today:", format(today, 'yyyy-MM-dd'));
-            console.log("Window End:", format(windowEnd, 'yyyy-MM-dd'));
-
             const birthdayUsers = (allUsers as any[])
                 .map(user => {
                     if (!user.dob) return null;
@@ -118,10 +114,6 @@ export function BirthdaySlider({ role }: { role: string }) {
 
                     const isWithinWindow = isAfterOrSameToday && isBeforeOrSameEnd;
 
-                    if (isWithinWindow) {
-                        console.log(`User ${user.full_name}: Next Birthday ${format(user.nextBirthday, 'yyyy-MM-dd')} (IN WINDOW)`);
-                    }
-
                     return isWithinWindow;
                 })
                 .sort((a, b) => {
@@ -129,7 +121,6 @@ export function BirthdaySlider({ role }: { role: string }) {
                     return a.nextBirthday.getTime() - b.nextBirthday.getTime();
                 });
 
-            console.log("Total Upcoming Birthdays:", birthdayUsers.length);
             setUsers(birthdayUsers);
         } catch (error) {
             console.error("Error fetching birthday data:", error);

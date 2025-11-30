@@ -44,7 +44,6 @@ export default function DashboardPage() {
     const handleFocus = () => {
       const currentToday = format(new Date(), 'yyyy-MM-dd');
       if (fetchedDate && currentToday !== fetchedDate) {
-        console.log("Window focused and day changed, refreshing status...");
         fetchTodayStatus();
       }
     };

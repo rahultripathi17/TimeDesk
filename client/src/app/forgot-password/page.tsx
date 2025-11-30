@@ -27,7 +27,7 @@ export default function ForgotPasswordPage() {
         setLoading(true);
         setError(null);
         setSuccess(false);
-        console.log("Attempting password reset for:", email);
+        setSuccess(false);
 
         try {
             // 1. Check if email exists in Auth (using a secure server function)
@@ -54,7 +54,7 @@ export default function ForgotPasswordPage() {
                 throw new Error(error.message);
             }
 
-            console.log("Reset link sent successfully to:", email);
+
             setSuccess(true);
         } catch (err: any) {
             console.error("Catch Error:", err);

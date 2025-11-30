@@ -194,3 +194,22 @@ add column if not exists employment_type text check (employment_type in ('full_t
 -- 9. Add salary to user_details
 alter table public.user_details
 add column if not exists salary numeric;
+
+-- 10. Add color to department_leave_limits
+alter table public.department_leave_limits
+add column if not exists color text default '#3b82f6';
+
+-- 11. Additional Policies
+create policy "Only admins can delete leave limits."
+  on department_leave_limits for delete
+  using (
+    exists (
+      select 1 from profiles
+      where id = auth.uid() and role = 'admin'
+    )
+  );
+
+-- 12. Additional Seed Data
+insert into public.system_settings (key, value)
+values ('common_info', 'Welcome to the Notice Board! Important announcements will appear here.')
+on conflict (key) do nothing;
