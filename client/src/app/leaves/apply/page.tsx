@@ -35,10 +35,7 @@ type LeaveRequest = {
     };
 };
 
-type LeaveLimit = {
-    leave_type: string;
-    limit_days: number;
-};
+
 
 export default function ApplyLeavePage() {
     const router = useRouter();
@@ -54,7 +51,7 @@ export default function ApplyLeavePage() {
     const [reason, setReason] = useState("");
 
     // Data State
-    const [limits, setLimits] = useState<LeaveLimit[]>([]);
+    const [balances, setBalances] = useState<{ leave_type: string, limit: number, used: number, remaining: number }[]>([]);
     const [department, setDepartment] = useState<string | null>(null);
     const [approvers, setApprovers] = useState<{ id: string, full_name: string, department: string | null, designation: string | null, role: string }[]>([]);
     const [userRole, setUserRole] = useState<string>("");
@@ -62,26 +59,20 @@ export default function ApplyLeavePage() {
     const [pendingLeaves, setPendingLeaves] = useState<LeaveRequest[]>([]);
     const [historyLeaves, setHistoryLeaves] = useState<LeaveRequest[]>([]);
 
-    const selectedBalance = limits.find(l => l.leave_type === leaveType)
-        ? {
-            remaining: limits.find(l => l.leave_type === leaveType)!.limit_days, // Simplified for now, should calculate actual remaining
-            used: 0 // Placeholder
-        }
-        : null;
+    const selectedBalance = balances.find(b => b.leave_type === leaveType);
 
     const approverName = approvers.find(a => a.id === selectedApproverId)?.full_name;
 
     // Helper to calculate balance
-    const getLeaveBalance = async (userId: string, dept: string) => {
-        // Fetch limits
-        const { data: limitsData } = await supabase
-            .from('department_leave_limits')
-            .select('leave_type, limit_days')
-            .eq('department', dept);
-
-        if (limitsData) {
-            // For now, just setting limits. Real implementation would calculate used days.
-            setLimits(limitsData);
+    const getLeaveBalance = async (userId: string) => {
+        try {
+            const res = await fetch(`/api/leaves/balance?userId=${userId}`);
+            if (res.ok) {
+                const data = await res.json();
+                setBalances(data.balances || []);
+            }
+        } catch (error) {
+            console.error("Error fetching balance:", error);
         }
     };
 
@@ -100,7 +91,7 @@ export default function ApplyLeavePage() {
             if (profile) {
                 setDepartment(profile.department);
                 if (profile.department) {
-                    await getLeaveBalance(user.id, profile.department);
+                    await getLeaveBalance(user.id);
                 }
 
                 // 2. Get Approvers based on Role
@@ -349,14 +340,14 @@ export default function ApplyLeavePage() {
                                                 <div className="flex items-center gap-2 text-sm text-slate-500">
                                                     <Loader2 className="h-4 w-4 animate-spin" /> Loading...
                                                 </div>
-                                            ) : limits.length > 0 ? (
+                                            ) : balances.length > 0 ? (
                                                 <>
                                                     <Select value={leaveType} onValueChange={setLeaveType} required>
                                                         <SelectTrigger id="type">
                                                             <SelectValue placeholder="Select leave type" />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            {limits.map((l) => (
+                                                            {balances.map((l) => (
                                                                 <SelectItem key={l.leave_type} value={l.leave_type}>
                                                                     {l.leave_type}
                                                                 </SelectItem>
@@ -501,7 +492,7 @@ export default function ApplyLeavePage() {
                                                 className="bg-blue-600 hover:bg-blue-700"
                                                 disabled={
                                                     loading ||
-                                                    limits.length === 0 ||
+                                                    balances.length === 0 ||
                                                     (!!selectedBalance && !!startDate && !!endDate && (
                                                         (Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1) > selectedBalance.remaining
                                                     ))
@@ -606,6 +597,11 @@ export default function ApplyLeavePage() {
                                                     <p className="text-sm text-slate-500">
                                                         {format(new Date(leave.start_date), "MMM d, yyyy")} - {format(new Date(leave.end_date), "MMM d, yyyy")}
                                                     </p>
+                                                    {leave.approver && (
+                                                        <p className="text-xs text-slate-400 mt-1">
+                                                            {leave.status === 'approved' ? 'Approved' : 'Rejected'} by <span className="font-medium text-slate-600">{leave.approver.full_name}</span>
+                                                        </p>
+                                                    )}
                                                 </div>
                                                 <div className="text-right text-xs text-slate-400">
                                                     Applied on {format(new Date(leave.created_at), "MMM d")}

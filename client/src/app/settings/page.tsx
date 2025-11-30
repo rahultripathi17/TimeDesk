@@ -17,6 +17,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2, CheckCircle2, AlertCircle, Lock, Mail, Eye, EyeOff, User, Camera, Upload } from "lucide-react";
 import { supabase } from "@/utils/supabase/client";
 import { toast } from "sonner";
+import { ProfilePictureUpload } from "@/components/ui/profile-picture-upload";
+import { validatePhone, validatePincode, validateAadhaar, validatePAN, validateRequired } from "@/utils/validation";
 
 const INDIAN_STATES = [
     "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana",
@@ -167,26 +169,52 @@ export default function SettingsPage() {
         }
     };
 
-    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        if (file.size > 150 * 1024) { // 150KB
-            toast.error("Image size must be less than 150KB");
-            return;
-        }
-
-        setAvatarFile(file);
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            setAvatarPreview(reader.result as string);
-        };
-        reader.readAsDataURL(file);
-    };
-
     const handleProfileUpdate = async (e: FormEvent) => {
         e.preventDefault();
         setProfileLoading(true);
+
+        // Strict Validation
+        const errors: string[] = [];
+
+        // Required Fields Check
+        const requiredFields = [
+            { key: "full_name", label: "Full Name" },
+            { key: "phone_number", label: "Phone Number" },
+            { key: "personal_email", label: "Personal Email" },
+            { key: "gender", label: "Gender" },
+            { key: "dob", label: "Date of Birth" },
+            { key: "address", label: "Address" },
+            { key: "city", label: "City" },
+            { key: "state", label: "State" },
+            { key: "pincode", label: "Pincode" },
+            { key: "bank_name", label: "Bank Name" },
+            { key: "account_number", label: "Account Number" },
+            { key: "ifsc_code", label: "IFSC Code" }
+        ];
+
+        requiredFields.forEach(field => {
+            const error = validateRequired(formData[field.key as keyof typeof formData], field.label);
+            if (error) errors.push(error);
+        });
+
+        // Specific Format Validation
+        const phoneError = validatePhone(formData.phone_number);
+        if (phoneError) errors.push(phoneError);
+
+        const pincodeError = validatePincode(formData.pincode);
+        if (pincodeError) errors.push(pincodeError);
+
+        const aadhaarError = validateAadhaar(formData.aadhaar_number);
+        if (aadhaarError) errors.push(aadhaarError);
+
+        const panError = validatePAN(formData.pan_number);
+        if (panError) errors.push(panError);
+
+        if (errors.length > 0) {
+            toast.error(errors[0]); // Show first error
+            setProfileLoading(false);
+            return;
+        }
 
         try {
             const { data: { user } } = await supabase.auth.getUser();
@@ -194,23 +222,11 @@ export default function SettingsPage() {
 
             let avatarUrl = avatarPreview;
 
-            // Upload Avatar if changed
-            if (avatarFile) {
-                const fileExt = avatarFile.name.split('.').pop();
-                const fileName = `${user.id}-${Math.random()}.${fileExt}`;
-                const filePath = `${fileName}`;
-
-                const { error: uploadError } = await supabase.storage
-                    .from('avatars')
-                    .upload(filePath, avatarFile);
-
-                if (uploadError) throw uploadError;
-
-                const { data: { publicUrl } } = supabase.storage
-                    .from('avatars')
-                    .getPublicUrl(filePath);
-
-                avatarUrl = publicUrl;
+            // Use the base64 preview string directly if it exists (whether from crop or initial load)
+            // But we only want to send it if it changed. 
+            // Ideally we should track if it changed, but sending the string again is fine for now.
+            if (avatarPreview) {
+                avatarUrl = avatarPreview;
             }
 
             // Update Profile & Details via API
@@ -237,13 +253,6 @@ export default function SettingsPage() {
         } finally {
             setProfileLoading(false);
         }
-    };
-
-    const getInitials = (name: string) => {
-        if (!name) return "U";
-        const parts = name.trim().split(" ");
-        if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
     };
 
     if (pageLoading) {
@@ -438,36 +447,22 @@ export default function SettingsPage() {
                                 </CardHeader>
                                 <CardContent className="space-y-6">
                                     {/* Avatar Upload */}
-                                    <div className="flex items-center gap-6">
-                                        <div className="relative h-24 w-24 shrink-0">
-                                            <Avatar className="h-24 w-24 border-4 border-white shadow-sm">
-                                                <AvatarImage src={avatarPreview || ""} className="object-cover" />
-                                                <AvatarFallback className="text-3xl bg-blue-50 text-blue-600 font-semibold">
-                                                    {formData.full_name ? getInitials(formData.full_name) : <User className="h-8 w-8" />}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label htmlFor="avatar" className="cursor-pointer inline-flex items-center gap-2 rounded-md border bg-white px-3 py-2 text-sm font-medium shadow-sm hover:bg-slate-50">
-                                                <Camera className="h-4 w-4" />
-                                                Change Photo
-                                            </Label>
-                                            <Input
-                                                id="avatar"
-                                                type="file"
-                                                accept="image/*"
-                                                className="hidden"
-                                                onChange={handleAvatarChange}
-                                            />
-                                            <p className="text-[10px] text-slate-500">
-                                                Max size 150KB. Supported formats: JPG, PNG.
-                                            </p>
-                                        </div>
-                                    </div>
+                                    <ProfilePictureUpload
+                                        currentImage={avatarPreview}
+                                        name={formData.full_name}
+                                        onImageChange={(file: File | null, preview: string | null) => {
+                                            setAvatarFile(file);
+                                            setAvatarPreview(preview);
+                                        }}
+                                        onRemove={() => {
+                                            setAvatarFile(null);
+                                            setAvatarPreview(null);
+                                        }}
+                                    />
 
                                     <div className="grid gap-4 md:grid-cols-2">
                                         <div className="space-y-2">
-                                            <Label htmlFor="full_name">Full Name</Label>
+                                            <Label htmlFor="full_name">Full Name <span className="text-red-500">*</span></Label>
                                             <Input
                                                 id="full_name"
                                                 value={formData.full_name}
@@ -476,16 +471,16 @@ export default function SettingsPage() {
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="phone">Phone Number</Label>
+                                            <Label htmlFor="phone">Phone Number <span className="text-red-500">*</span></Label>
                                             <Input
                                                 id="phone"
                                                 value={formData.phone_number}
                                                 onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-                                                placeholder="+91 98765 43210"
+                                                placeholder="e.g. 9876543210"
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="personal_email">Personal Email</Label>
+                                            <Label htmlFor="personal_email">Personal Email <span className="text-red-500">*</span></Label>
                                             <Input
                                                 id="personal_email"
                                                 type="email"
@@ -495,7 +490,7 @@ export default function SettingsPage() {
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="gender">Gender</Label>
+                                            <Label htmlFor="gender">Gender <span className="text-red-500">*</span></Label>
                                             <select
                                                 id="gender"
                                                 className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -509,7 +504,7 @@ export default function SettingsPage() {
                                             </select>
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="dob">Date of Birth</Label>
+                                            <Label htmlFor="dob">Date of Birth <span className="text-red-500">*</span></Label>
                                             <Input
                                                 id="dob"
                                                 type="date"
@@ -520,7 +515,7 @@ export default function SettingsPage() {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="address">Address</Label>
+                                        <Label htmlFor="address">Address <span className="text-red-500">*</span></Label>
                                         <Input
                                             id="address"
                                             value={formData.address}
@@ -530,7 +525,7 @@ export default function SettingsPage() {
 
                                     <div className="grid gap-4 md:grid-cols-3">
                                         <div className="space-y-2">
-                                            <Label htmlFor="city">City</Label>
+                                            <Label htmlFor="city">City <span className="text-red-500">*</span></Label>
                                             <Input
                                                 id="city"
                                                 value={formData.city}
@@ -538,7 +533,7 @@ export default function SettingsPage() {
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="state">State</Label>
+                                            <Label htmlFor="state">State <span className="text-red-500">*</span></Label>
                                             <select
                                                 id="state"
                                                 className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -552,7 +547,7 @@ export default function SettingsPage() {
                                             </select>
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="pincode">Pincode</Label>
+                                            <Label htmlFor="pincode">Pincode <span className="text-red-500">*</span></Label>
                                             <Input
                                                 id="pincode"
                                                 value={formData.pincode}
@@ -565,7 +560,7 @@ export default function SettingsPage() {
                                         <h3 className="text-sm font-medium text-slate-900 mb-4">Bank & Statutory Details</h3>
                                         <div className="grid gap-4 md:grid-cols-2">
                                             <div className="space-y-2">
-                                                <Label htmlFor="bank_name">Bank Name</Label>
+                                                <Label htmlFor="bank_name">Bank Name <span className="text-red-500">*</span></Label>
                                                 <Input
                                                     id="bank_name"
                                                     value={formData.bank_name}
@@ -573,7 +568,7 @@ export default function SettingsPage() {
                                                 />
                                             </div>
                                             <div className="space-y-2">
-                                                <Label htmlFor="account_number">Account Number</Label>
+                                                <Label htmlFor="account_number">Account Number <span className="text-red-500">*</span></Label>
                                                 <Input
                                                     id="account_number"
                                                     value={formData.account_number}
@@ -581,7 +576,7 @@ export default function SettingsPage() {
                                                 />
                                             </div>
                                             <div className="space-y-2">
-                                                <Label htmlFor="ifsc">IFSC Code</Label>
+                                                <Label htmlFor="ifsc">IFSC Code <span className="text-red-500">*</span></Label>
                                                 <Input
                                                     id="ifsc"
                                                     value={formData.ifsc_code}
@@ -625,6 +620,9 @@ export default function SettingsPage() {
                     </div>
                 )}
             </div>
-        </AppShell>
+
+
+
+        </AppShell >
     );
 }

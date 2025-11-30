@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { validatePhone, validatePincode, validateAadhaar, validatePAN } from '@/utils/validation';
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,6 +35,29 @@ export async function PUT(request: NextRequest) {
             return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
         }
 
+        // Server-side Validation
+        const errors = [];
+        if (phone_number) {
+            const err = validatePhone(phone_number);
+            if (err) errors.push(err);
+        }
+        if (pincode) {
+            const err = validatePincode(pincode);
+            if (err) errors.push(err);
+        }
+        if (aadhaar_number) {
+            const err = validateAadhaar(aadhaar_number);
+            if (err) errors.push(err);
+        }
+        if (pan_number) {
+            const err = validatePAN(pan_number);
+            if (err) errors.push(err);
+        }
+
+        if (errors.length > 0) {
+            return NextResponse.json({ error: errors[0] }, { status: 400 });
+        }
+
         // Verify the requester is the user (or admin/hr - but for now let's assume self-edit or admin)
         // Ideally we check the auth token here, but for this implementation we'll trust the client sends the correct ID
         // and rely on the fact that we are using admin client to bypass RLS if needed, 
@@ -64,7 +88,7 @@ export async function PUT(request: NextRequest) {
                 id: userId,
                 personal_email,
                 phone_number,
-                gender,
+                gender: gender || null,
                 dob,
                 address,
                 city,

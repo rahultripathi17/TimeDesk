@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { validatePhone, validatePincode, validateAadhaar, validatePAN } from '@/utils/validation';
 
 export async function GET(request: Request) {
     try {
@@ -92,6 +93,47 @@ export async function POST(request: Request) {
             username,
             avatarUrl
         } = body;
+
+        // Server-side Validation
+        const errors = [];
+        if (phone) {
+            const err = validatePhone(phone);
+            if (err) errors.push(err);
+        }
+        if (pincode) {
+            const err = validatePincode(pincode);
+            if (err) errors.push(err);
+        }
+        if (aadhaar) {
+            const err = validateAadhaar(aadhaar);
+            if (err) errors.push(err);
+        }
+        if (pan) {
+            const err = validatePAN(pan);
+            if (err) errors.push(err);
+        }
+        if (!designation) errors.push("Designation is required");
+        if (!reportingManagers || !Array.isArray(reportingManagers) || reportingManagers.length === 0) {
+            errors.push("At least one Reporting Manager is required");
+        }
+
+        // Work Config Validation
+        const workConfig = body.workConfig;
+        if (!workConfig || !workConfig.mode) {
+            errors.push("Working Time Configuration is required");
+        } else if (workConfig.mode === 'fixed') {
+            if (!workConfig.fixed?.start_time || !workConfig.fixed?.end_time) {
+                errors.push("Start Time and End Time are required for Fixed Shift");
+            }
+        } else if (workConfig.mode === 'flexible') {
+            if (!workConfig.flexible?.daily_hours) {
+                errors.push("Daily Hours are required for Flexible/Part-time");
+            }
+        }
+
+        if (errors.length > 0) {
+            return NextResponse.json({ error: errors[0] }, { status: 400 });
+        }
 
         // Initialize Supabase Admin Client
         const supabaseAdmin = createClient(
@@ -215,6 +257,47 @@ export async function PUT(request: Request) {
             username,
             avatarUrl
         } = body;
+
+        // Server-side Validation
+        const errors = [];
+        if (phone) {
+            const err = validatePhone(phone);
+            if (err) errors.push(err);
+        }
+        if (pincode) {
+            const err = validatePincode(pincode);
+            if (err) errors.push(err);
+        }
+        if (aadhaar) {
+            const err = validateAadhaar(aadhaar);
+            if (err) errors.push(err);
+        }
+        if (pan) {
+            const err = validatePAN(pan);
+            if (err) errors.push(err);
+        }
+        if (!designation) errors.push("Designation is required");
+        if (!reportingManagers || !Array.isArray(reportingManagers) || reportingManagers.length === 0) {
+            errors.push("At least one Reporting Manager is required");
+        }
+
+        // Work Config Validation
+        const workConfig = body.workConfig;
+        if (!workConfig || !workConfig.mode) {
+            errors.push("Working Time Configuration is required");
+        } else if (workConfig.mode === 'fixed') {
+            if (!workConfig.fixed?.start_time || !workConfig.fixed?.end_time) {
+                errors.push("Start Time and End Time are required for Fixed Shift");
+            }
+        } else if (workConfig.mode === 'flexible') {
+            if (!workConfig.flexible?.daily_hours) {
+                errors.push("Daily Hours are required for Flexible/Part-time");
+            }
+        }
+
+        if (errors.length > 0) {
+            return NextResponse.json({ error: errors[0] }, { status: 400 });
+        }
 
         if (!userId) {
             return NextResponse.json({ error: 'User ID is required' }, { status: 400 });

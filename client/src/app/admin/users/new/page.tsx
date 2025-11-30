@@ -35,6 +35,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/utils/supabase/client";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, Suspense } from "react";
+import { validatePhone, validatePincode, validateAadhaar, validatePAN, validateRequired } from "@/utils/validation";
+import { ProfilePictureUpload } from "@/components/ui/profile-picture-upload";
 
 
 
@@ -65,7 +67,7 @@ function AddUserForm() {
     const [dob, setDob] = useState<Date>();
     const [openManager, setOpenManager] = useState(false);
     const [selectedManagers, setSelectedManagers] = useState<string[]>([]);
-    const [managersList, setManagersList] = useState<{ value: string, label: string }[]>([]);
+    const [managersList, setManagersList] = useState<{ value: string, label: string, designation?: string, department?: string, role?: string }[]>([]);
     const [fullName, setFullName] = useState("");
     const [profilePic, setProfilePic] = useState<string | null>(null);
 
@@ -144,15 +146,18 @@ function AddUserForm() {
         try {
             const { data, error } = await supabase
                 .from('profiles')
-                .select('id, full_name')
-                .eq('role', 'manager');
+                .select('id, full_name, designation, department, role')
+                .in('role', ['manager', 'admin', 'hr']);
 
             if (error) throw error;
 
             if (data) {
                 setManagersList(data.map(user => ({
                     value: user.id,
-                    label: user.full_name
+                    label: user.full_name,
+                    designation: user.designation,
+                    department: user.department,
+                    role: user.role
                 })));
             }
         } catch (err) {
@@ -231,23 +236,7 @@ function AddUserForm() {
         setSelectedManagers((current) => current.filter((item) => item !== value));
     };
 
-    const getInitials = (name: string) => {
-        if (!name) return "U";
-        const parts = name.trim().split(" ");
-        if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-    };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setProfilePic(reader.result as string);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -311,13 +300,73 @@ function AddUserForm() {
                 }
             };
 
-            // Basic Validation
-            if (!formData.fullName || !formData.email || (!isEditMode && !formData.password) || !formData.dateOfJoining) {
-                throw new Error("Please fill in all required fields (marked with *)");
+            // Strict Validation
+            const errors: string[] = [];
+
+            // Required Fields Check
+            const requiredFields = [
+                { value: fullName, label: "Full Name" },
+                { value: personalEmail, label: "Personal Email" },
+                { value: phone, label: "Phone Number" },
+                { value: gender, label: "Gender" },
+                { value: dob ? dob.toISOString() : "", label: "Date of Birth" },
+                { value: address, label: "Address" },
+                { value: city, label: "City" },
+                { value: state, label: "State" },
+                { value: pincode, label: "Pincode" },
+                { value: pincode, label: "Pincode" },
+                { value: doj, label: "Date of Joining" },
+                { value: department, label: "Department" },
+                { value: role, label: "Role" },
+                { value: employmentType, label: "Employment Type" },
+                { value: designation, label: "Designation" }
+            ];
+
+            if (selectedManagers.length === 0) {
+                errors.push("At least one Reporting Manager is required");
+            }
+
+            requiredFields.forEach(field => {
+                const error = validateRequired(field.value, field.label);
+                if (error) errors.push(error);
+            });
+
+            // Specific Format Validation
+            const phoneError = validatePhone(phone);
+            if (phoneError) errors.push(phoneError);
+
+            const pincodeError = validatePincode(pincode);
+            if (pincodeError) errors.push(pincodeError);
+
+            const aadhaarError = validateAadhaar(aadhaar);
+            if (aadhaarError) errors.push(aadhaarError);
+
+            const panError = validatePAN(pan);
+            if (panError) errors.push(panError);
+
+            if (!isEditMode && !formData.password) {
+                errors.push("Password is required for new users");
             }
 
             if (formData.password && formData.password.length < 6) {
-                throw new Error("Password must be at least 6 characters long");
+                errors.push("Password must be at least 6 characters long");
+            }
+
+            // Working Time Validation
+            if (!workMode) {
+                errors.push("Work Mode is required");
+            } else if (workMode === 'fixed') {
+                if (!fixedStartTime || !fixedEndTime) {
+                    errors.push("Start Time and End Time are required for Fixed Shift");
+                }
+            } else if (workMode === 'flexible') {
+                if (!flexibleDailyHours || parseInt(flexibleDailyHours) <= 0) {
+                    errors.push("Valid Daily Hours are required for Flexible/Part-time");
+                }
+            }
+
+            if (errors.length > 0) {
+                throw new Error(errors[0]);
             }
 
             const method = isEditMode ? 'PUT' : 'POST';
@@ -428,28 +477,14 @@ function AddUserForm() {
                                     Personal Information
                                 </h3>
 
-                                <div className="flex items-center gap-6 mb-6">
-                                    <Avatar className="h-20 w-20 border-2 border-slate-100">
-                                        <AvatarImage src={profilePic || undefined} className="object-cover" />
-                                        <AvatarFallback className="text-xl font-semibold bg-blue-50 text-blue-600">
-                                            {getInitials(fullName)}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="picture" className="text-xs font-medium">
-                                            Profile Picture
-                                        </Label>
-                                        <Input
-                                            id="picture"
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={handleFileChange}
-                                            className="w-full max-w-xs text-xs file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                                        />
-                                        <p className="text-[10px] text-slate-500">
-                                            Upload a profile picture. Initials will be shown if no image is uploaded.
-                                        </p>
-                                    </div>
+                                <div className="mb-6">
+                                    <Label className="text-xs font-medium mb-2 block">Profile Picture</Label>
+                                    <ProfilePictureUpload
+                                        currentImage={profilePic}
+                                        name={fullName}
+                                        onImageChange={(file, preview) => setProfilePic(preview)}
+                                        onRemove={() => setProfilePic(null)}
+                                    />
                                 </div>
 
                                 <div className="grid gap-4 md:grid-cols-2">
@@ -467,7 +502,7 @@ function AddUserForm() {
 
                                     <div className="space-y-2">
                                         <Label htmlFor="personalEmail" className="text-xs font-medium">
-                                            Personal Email
+                                            Personal Email <span className="text-red-500">*</span>
                                         </Label>
                                         <Input
                                             id="personalEmail"
@@ -479,19 +514,19 @@ function AddUserForm() {
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="phone" className="text-xs font-medium">
-                                            Phone Number
+                                            Phone Number <span className="text-red-500">*</span>
                                         </Label>
                                         <Input
                                             id="phone"
                                             type="tel"
-                                            placeholder="e.g. +91 9876543210"
+                                            placeholder="e.g. 9876543210"
                                             value={phone}
                                             onChange={(e) => setPhone(e.target.value)}
                                         />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="gender" className="text-xs font-medium">
-                                            Gender
+                                            Gender <span className="text-red-500">*</span>
                                         </Label>
                                         <Select value={gender} onValueChange={setGender}>
                                             <SelectTrigger id="gender">
@@ -506,7 +541,7 @@ function AddUserForm() {
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="dob" className="text-xs font-medium">
-                                            Date of Birth
+                                            Date of Birth <span className="text-red-500">*</span>
                                         </Label>
                                         <Input
                                             id="dob"
@@ -527,7 +562,7 @@ function AddUserForm() {
                                 <div className="grid gap-4 md:grid-cols-2">
                                     <div className="space-y-2 md:col-span-2">
                                         <Label htmlFor="address" className="text-xs font-medium">
-                                            Address
+                                            Address <span className="text-red-500">*</span>
                                         </Label>
                                         <Textarea
                                             id="address"
@@ -538,7 +573,7 @@ function AddUserForm() {
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="city" className="text-xs font-medium">
-                                            City
+                                            City <span className="text-red-500">*</span>
                                         </Label>
                                         <Input
                                             id="city"
@@ -549,7 +584,7 @@ function AddUserForm() {
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="state" className="text-xs font-medium">
-                                            State
+                                            State <span className="text-red-500">*</span>
                                         </Label>
                                         <Select value={state} onValueChange={setState}>
                                             <SelectTrigger id="state">
@@ -566,7 +601,7 @@ function AddUserForm() {
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="pincode" className="text-xs font-medium">
-                                            Pincode
+                                            Pincode <span className="text-red-500">*</span>
                                         </Label>
                                         <Input
                                             id="pincode"
@@ -700,7 +735,7 @@ function AddUserForm() {
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="designation" className="text-xs font-medium">
-                                            Designation
+                                            Designation <span className="text-red-500">*</span>
                                         </Label>
                                         <Input
                                             id="designation"
@@ -711,7 +746,7 @@ function AddUserForm() {
                                     </div>
                                     <div className="space-y-2 md:col-span-2">
                                         <Label htmlFor="manager" className="text-xs font-medium">
-                                            Reporting Manager(s)
+                                            Reporting Manager(s) <span className="text-red-500">*</span>
                                         </Label>
                                         <Popover open={openManager} onOpenChange={setOpenManager}>
                                             <PopoverTrigger asChild>
@@ -749,7 +784,12 @@ function AddUserForm() {
                                                                                 : "opacity-0"
                                                                         )}
                                                                     />
-                                                                    {manager.label}
+                                                                    <div className="flex flex-col">
+                                                                        <span>{manager.label}</span>
+                                                                        <span className="text-xs text-slate-500">
+                                                                            {manager.role?.toUpperCase()} • {manager.designation} • {manager.department}
+                                                                        </span>
+                                                                    </div>
                                                                 </CommandItem>
                                                             ))}
                                                         </CommandGroup>
@@ -789,7 +829,7 @@ function AddUserForm() {
                             {/* Working Time Configuration */}
                             <div className="space-y-4">
                                 <h3 className="text-sm font-medium text-slate-900 border-b pb-2">
-                                    Working Time Configuration
+                                    Working Time Configuration <span className="text-red-500">*</span>
                                 </h3>
                                 <div className="space-y-4">
                                     <div className="space-y-2">
