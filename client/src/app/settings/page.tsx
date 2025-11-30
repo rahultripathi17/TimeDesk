@@ -236,7 +236,9 @@ export default function SettingsPage() {
                 body: JSON.stringify({
                     userId: user.id,
                     avatar_url: avatarUrl,
-                    ...formData
+                    ...formData,
+                    pan_number: formData.pan_number || null,
+                    aadhaar_number: formData.aadhaar_number || null
                 }),
             });
 
@@ -246,6 +248,8 @@ export default function SettingsPage() {
             }
 
             toast.success("Profile updated successfully");
+            setSuccess(true);
+            setCountdown(5);
             setAvatarFile(null); // Reset file input
         } catch (error: any) {
             console.error(error);
@@ -434,189 +438,213 @@ export default function SettingsPage() {
                     </div>
                 ) : (
                     <div className="space-y-6">
-                        <form onSubmit={handleProfileUpdate}>
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base flex items-center gap-2">
-                                        <User className="h-4 w-4 text-slate-500" />
-                                        Profile Details
-                                    </CardTitle>
-                                    <CardDescription>
-                                        Update your personal information and profile picture.
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-6">
-                                    {/* Avatar Upload */}
-                                    <ProfilePictureUpload
-                                        currentImage={avatarPreview}
-                                        name={formData.full_name}
-                                        onImageChange={(file: File | null, preview: string | null) => {
-                                            setAvatarFile(file);
-                                            setAvatarPreview(preview);
-                                        }}
-                                        onRemove={() => {
-                                            setAvatarFile(null);
-                                            setAvatarPreview(null);
-                                        }}
-                                    />
-
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="full_name">Full Name <span className="text-red-500">*</span></Label>
-                                            <Input
-                                                id="full_name"
-                                                value={formData.full_name}
-                                                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                                                required
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="phone">Phone Number <span className="text-red-500">*</span></Label>
-                                            <Input
-                                                id="phone"
-                                                value={formData.phone_number}
-                                                onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-                                                placeholder="e.g. 9876543210"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="personal_email">Personal Email <span className="text-red-500">*</span></Label>
-                                            <Input
-                                                id="personal_email"
-                                                type="email"
-                                                value={formData.personal_email}
-                                                onChange={(e) => setFormData({ ...formData, personal_email: e.target.value })}
-                                                placeholder="you@gmail.com"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="gender">Gender <span className="text-red-500">*</span></Label>
-                                            <select
-                                                id="gender"
-                                                className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                                value={formData.gender}
-                                                onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                                            >
-                                                <option value="">Select Gender</option>
-                                                <option value="Male">Male</option>
-                                                <option value="Female">Female</option>
-                                                <option value="Other">Other</option>
-                                            </select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="dob">Date of Birth <span className="text-red-500">*</span></Label>
-                                            <Input
-                                                id="dob"
-                                                type="date"
-                                                value={formData.dob}
-                                                onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="address">Address <span className="text-red-500">*</span></Label>
-                                        <Input
-                                            id="address"
-                                            value={formData.address}
-                                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                        {success ? (
+                            <div className="flex flex-col items-center justify-center space-y-4 py-6 text-center animate-in fade-in zoom-in duration-300">
+                                <div className="rounded-full bg-green-100 p-3">
+                                    <CheckCircle2 className="h-8 w-8 text-green-600" />
+                                </div>
+                                <div className="space-y-1">
+                                    <h3 className="font-semibold text-lg text-slate-900">Profile Updated!</h3>
+                                    <p className="text-sm text-slate-500 max-w-xs mx-auto">
+                                        Your profile details have been successfully updated.
+                                    </p>
+                                    <p className="text-xs text-slate-400 mt-2">
+                                        Redirecting to dashboard in {countdown} seconds...
+                                    </p>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => router.push("/dashboard")}
+                                    className="mt-2"
+                                >
+                                    Go to Dashboard Now
+                                </Button>
+                            </div>
+                        ) : (
+                            <form onSubmit={handleProfileUpdate}>
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="text-base flex items-center gap-2">
+                                            <User className="h-4 w-4 text-slate-500" />
+                                            Profile Details
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Update your personal information and profile picture.
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="space-y-6">
+                                        {/* Avatar Upload */}
+                                        <ProfilePictureUpload
+                                            currentImage={avatarPreview}
+                                            name={formData.full_name}
+                                            onImageChange={(file: File | null, preview: string | null) => {
+                                                setAvatarFile(file);
+                                                setAvatarPreview(preview);
+                                            }}
+                                            onRemove={() => {
+                                                setAvatarFile(null);
+                                                setAvatarPreview(null);
+                                            }}
                                         />
-                                    </div>
 
-                                    <div className="grid gap-4 md:grid-cols-3">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="city">City <span className="text-red-500">*</span></Label>
-                                            <Input
-                                                id="city"
-                                                value={formData.city}
-                                                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="state">State <span className="text-red-500">*</span></Label>
-                                            <select
-                                                id="state"
-                                                className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                                value={formData.state}
-                                                onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                                            >
-                                                <option value="">Select State</option>
-                                                {INDIAN_STATES.map(state => (
-                                                    <option key={state} value={state}>{state}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="pincode">Pincode <span className="text-red-500">*</span></Label>
-                                            <Input
-                                                id="pincode"
-                                                value={formData.pincode}
-                                                onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="pt-4 border-t">
-                                        <h3 className="text-sm font-medium text-slate-900 mb-4">Bank & Statutory Details</h3>
                                         <div className="grid gap-4 md:grid-cols-2">
                                             <div className="space-y-2">
-                                                <Label htmlFor="bank_name">Bank Name <span className="text-red-500">*</span></Label>
+                                                <Label htmlFor="full_name">Full Name <span className="text-red-500">*</span></Label>
                                                 <Input
-                                                    id="bank_name"
-                                                    value={formData.bank_name}
-                                                    onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
+                                                    id="full_name"
+                                                    value={formData.full_name}
+                                                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                                                    required
                                                 />
                                             </div>
                                             <div className="space-y-2">
-                                                <Label htmlFor="account_number">Account Number <span className="text-red-500">*</span></Label>
+                                                <Label htmlFor="phone">Phone Number <span className="text-red-500">*</span></Label>
                                                 <Input
-                                                    id="account_number"
-                                                    value={formData.account_number}
-                                                    onChange={(e) => setFormData({ ...formData, account_number: e.target.value })}
+                                                    id="phone"
+                                                    value={formData.phone_number}
+                                                    onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                                                    placeholder="e.g. 9876543210"
                                                 />
                                             </div>
                                             <div className="space-y-2">
-                                                <Label htmlFor="ifsc">IFSC Code <span className="text-red-500">*</span></Label>
+                                                <Label htmlFor="personal_email">Personal Email <span className="text-red-500">*</span></Label>
                                                 <Input
-                                                    id="ifsc"
-                                                    value={formData.ifsc_code}
-                                                    onChange={(e) => setFormData({ ...formData, ifsc_code: e.target.value })}
+                                                    id="personal_email"
+                                                    type="email"
+                                                    value={formData.personal_email}
+                                                    onChange={(e) => setFormData({ ...formData, personal_email: e.target.value })}
+                                                    placeholder="you@gmail.com"
                                                 />
                                             </div>
                                             <div className="space-y-2">
-                                                <Label htmlFor="pan">PAN Number</Label>
-                                                <Input
-                                                    id="pan"
-                                                    value={formData.pan_number}
-                                                    onChange={(e) => setFormData({ ...formData, pan_number: e.target.value })}
-                                                />
+                                                <Label htmlFor="gender">Gender <span className="text-red-500">*</span></Label>
+                                                <select
+                                                    id="gender"
+                                                    className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                    value={formData.gender}
+                                                    onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                                                >
+                                                    <option value="">Select Gender</option>
+                                                    <option value="Male">Male</option>
+                                                    <option value="Female">Female</option>
+                                                    <option value="Other">Other</option>
+                                                </select>
                                             </div>
                                             <div className="space-y-2">
-                                                <Label htmlFor="aadhaar">Aadhaar Number</Label>
+                                                <Label htmlFor="dob">Date of Birth <span className="text-red-500">*</span></Label>
                                                 <Input
-                                                    id="aadhaar"
-                                                    value={formData.aadhaar_number}
-                                                    onChange={(e) => setFormData({ ...formData, aadhaar_number: e.target.value })}
+                                                    id="dob"
+                                                    type="date"
+                                                    value={formData.dob}
+                                                    onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
                                                 />
                                             </div>
                                         </div>
-                                    </div>
 
-                                    <div className="flex justify-end pt-4">
-                                        <Button type="submit" disabled={profileLoading}>
-                                            {profileLoading ? (
-                                                <>
-                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                    Saving...
-                                                </>
-                                            ) : (
-                                                "Save Changes"
-                                            )}
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </form>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="address">Address <span className="text-red-500">*</span></Label>
+                                            <Input
+                                                id="address"
+                                                value={formData.address}
+                                                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                            />
+                                        </div>
+
+                                        <div className="grid gap-4 md:grid-cols-3">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="city">City <span className="text-red-500">*</span></Label>
+                                                <Input
+                                                    id="city"
+                                                    value={formData.city}
+                                                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="state">State <span className="text-red-500">*</span></Label>
+                                                <select
+                                                    id="state"
+                                                    className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                    value={formData.state}
+                                                    onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                                                >
+                                                    <option value="">Select State</option>
+                                                    {INDIAN_STATES.map(state => (
+                                                        <option key={state} value={state}>{state}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="pincode">Pincode <span className="text-red-500">*</span></Label>
+                                                <Input
+                                                    id="pincode"
+                                                    value={formData.pincode}
+                                                    onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-4 border-t">
+                                            <h3 className="text-sm font-medium text-slate-900 mb-4">Bank & Statutory Details</h3>
+                                            <div className="grid gap-4 md:grid-cols-2">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="bank_name">Bank Name <span className="text-red-500">*</span></Label>
+                                                    <Input
+                                                        id="bank_name"
+                                                        value={formData.bank_name}
+                                                        onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="account_number">Account Number <span className="text-red-500">*</span></Label>
+                                                    <Input
+                                                        id="account_number"
+                                                        value={formData.account_number}
+                                                        onChange={(e) => setFormData({ ...formData, account_number: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="ifsc">IFSC Code <span className="text-red-500">*</span></Label>
+                                                    <Input
+                                                        id="ifsc"
+                                                        value={formData.ifsc_code}
+                                                        onChange={(e) => setFormData({ ...formData, ifsc_code: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="pan">PAN Number</Label>
+                                                    <Input
+                                                        id="pan"
+                                                        value={formData.pan_number}
+                                                        onChange={(e) => setFormData({ ...formData, pan_number: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="aadhaar">Aadhaar Number</Label>
+                                                    <Input
+                                                        id="aadhaar"
+                                                        value={formData.aadhaar_number}
+                                                        onChange={(e) => setFormData({ ...formData, aadhaar_number: e.target.value })}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex justify-end pt-4">
+                                            <Button type="submit" disabled={profileLoading}>
+                                                {profileLoading ? (
+                                                    <>
+                                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                        Saving...
+                                                    </>
+                                                ) : (
+                                                    "Save Changes"
+                                                )}
+                                            </Button>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </form>
+                        )}
                     </div>
                 )}
             </div>

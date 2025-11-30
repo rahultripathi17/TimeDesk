@@ -265,8 +265,8 @@ function AddUserForm() {
                 pincode,
 
                 // Identity
-                pan,
-                aadhaar,
+                pan: pan || null,
+                aadhaar: aadhaar || null,
                 salary: salary ? parseFloat(salary) : null,
 
                 // Employment

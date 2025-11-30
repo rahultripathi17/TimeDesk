@@ -76,7 +76,7 @@ export function ProfilePictureUpload({ currentImage, name, onImageChange, onRemo
         <div className="flex items-center gap-6">
             <div className="relative h-24 w-24 shrink-0">
                 <Avatar className="h-24 w-24 border-4 border-white shadow-sm">
-                    <AvatarImage src={currentImage || ""} className="object-cover" />
+                    {currentImage && <AvatarImage src={currentImage} className="object-cover" />}
                     <AvatarFallback className="text-3xl bg-blue-50 text-blue-600 font-semibold">
                         {name ? getInitials(name) : <User className="h-8 w-8" />}
                     </AvatarFallback>
