@@ -75,7 +75,7 @@ type LeaveType = {
   color: string;
 };
 
-export function AttendanceCalendar({ employeeId }: { employeeId: string }) {
+export function AttendanceCalendar({ userId }: { userId?: string }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
@@ -100,8 +100,13 @@ export function AttendanceCalendar({ employeeId }: { employeeId: string }) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      let targetUserId = userId;
+
+      if (!targetUserId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        targetUserId = user.id;
+      }
 
       const monthStartStr = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
       const monthEndStr = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
@@ -110,7 +115,7 @@ export function AttendanceCalendar({ employeeId }: { employeeId: string }) {
       const { data: attendanceData } = await supabase
         .from('attendance')
         .select('date, status')
-        .eq('user_id', user.id)
+        .eq('user_id', targetUserId)
         .gte('date', monthStartStr)
         .lte('date', monthEndStr);
 
@@ -120,7 +125,7 @@ export function AttendanceCalendar({ employeeId }: { employeeId: string }) {
       const { data: leavesData } = await supabase
         .from('leaves')
         .select('start_date, end_date, type, status')
-        .eq('user_id', user.id)
+        .eq('user_id', targetUserId)
         .eq('status', 'approved')
         .lte('start_date', monthEndStr)
         .gte('end_date', monthStartStr);

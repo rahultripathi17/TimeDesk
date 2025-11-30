@@ -2,10 +2,23 @@
 
 import { AppShell } from "@/components/layout/AppShell";
 import { AttendanceCalendar } from "@/components/attendance/AttendanceCalendar";
+import { useState, useEffect } from "react";
+import { supabase } from "@/utils/supabase/client";
 
 export default function MyAttendancePage() {
-  // later: replace with logged-in user's employeeId from auth
-  const employeeId = "EMP-001";
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+      }
+    };
+    fetchUser();
+  }, []);
+
+  if (!userId) return null; // Or a loading spinner
 
   return (
     <AppShell role="employee">
@@ -22,9 +35,7 @@ export default function MyAttendancePage() {
             </div>
           </header>
 
-          {/* You can add summary cards here later (Avg hours, etc.) */}
-
-          <AttendanceCalendar employeeId={employeeId} />
+          <AttendanceCalendar userId={userId} />
         </div>
       </main>
     </AppShell>

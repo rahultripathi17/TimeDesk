@@ -23,8 +23,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Search, CalendarDays, Loader2 } from "lucide-react";
 import { format } from "date-fns";
-import { AttendanceCalendarDialog } from "./AttendanceCalendarDialog";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 interface TeamAttendanceListProps {
     role: "admin" | "hr" | "manager" | "employee";
@@ -36,9 +36,7 @@ export function TeamAttendanceList({ role }: TeamAttendanceListProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [currentUser, setCurrentUser] = useState<any>(null);
 
-    // Dialog State
-    const [selectedUser, setSelectedUser] = useState<{ id: string, name: string, avatar: string | null } | null>(null);
-    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+    const router = useRouter();
 
     useEffect(() => {
         fetchCurrentUserAndTeam();
@@ -83,10 +81,7 @@ export function TeamAttendanceList({ role }: TeamAttendanceListProps) {
                     query = query.eq('department', profile.department);
                 }
             } else if (role === 'manager') {
-                // Managers see their department OR people reporting to them (if we had that link explicitly, 
-                // but for now let's assume Department based on "Team" context usually meaning Dept in this app)
-                // If we want to be strict about "Team" = "Reportees", we'd need to check reporting_managers column.
-                // Let's stick to Department for now as it's safer and covers "Team".
+                // Managers see their department OR people reporting to them
                 if (profile.department) {
                     query = query.eq('department', profile.department);
                 }
@@ -116,9 +111,6 @@ export function TeamAttendanceList({ role }: TeamAttendanceListProps) {
                     );
                     if (activeLeave) status = 'leave';
                 }
-
-                // If it's the user themselves and no status, show "Not Marked" or keep absent?
-                // Let's keep 'absent' as default for "Not In yet".
 
                 return {
                     ...u,
@@ -241,14 +233,7 @@ export function TeamAttendanceList({ role }: TeamAttendanceListProps) {
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                <DropdownMenuItem onClick={() => {
-                                                    setSelectedUser({
-                                                        id: user.id,
-                                                        name: user.full_name,
-                                                        avatar: user.avatar_url
-                                                    });
-                                                    setIsCalendarOpen(true);
-                                                }}>
+                                                <DropdownMenuItem onClick={() => router.push(`/attendance/${user.id}`)}>
                                                     <CalendarDays className="mr-2 h-4 w-4" />
                                                     View Attendance Calendar
                                                 </DropdownMenuItem>
@@ -267,14 +252,6 @@ export function TeamAttendanceList({ role }: TeamAttendanceListProps) {
                     </TableBody>
                 </Table>
             </div>
-
-            <AttendanceCalendarDialog
-                isOpen={isCalendarOpen}
-                onClose={() => setIsCalendarOpen(false)}
-                userId={selectedUser?.id || null}
-                userName={selectedUser?.name || ""}
-                userAvatar={selectedUser?.avatar}
-            />
         </div>
     );
 }
