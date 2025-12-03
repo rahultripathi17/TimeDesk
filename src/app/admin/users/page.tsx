@@ -388,8 +388,8 @@ export default function UsersListPage() {
                                             <TableCell className="font-medium">
                                                 <div className="flex items-center gap-3">
                                                     <Avatar className="h-9 w-9">
-                                                        <AvatarImage src={user.avatar_url} />
-                                                        <AvatarFallback className="bg-blue-50 text-blue-600 text-xs">
+                                                        <AvatarImage src={(user.avatar_url && user.avatar_url !== "NULL" && user.avatar_url !== "null") ? user.avatar_url : undefined} />
+                                                        <AvatarFallback className="bg-blue-100 text-blue-700 text-xs">
                                                             {user.initials}
                                                         </AvatarFallback>
                                                     </Avatar>
@@ -468,8 +468,8 @@ export default function UsersListPage() {
                             {/* Header Section */}
                             <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
                                 <Avatar className="h-24 w-24 border-4 border-white shadow-sm">
-                                    <AvatarImage src={viewUser.avatar_url} />
-                                    <AvatarFallback className="text-3xl bg-blue-50 text-blue-600 font-semibold">
+                                    <AvatarImage src={(viewUser.avatar_url && viewUser.avatar_url !== "NULL" && viewUser.avatar_url !== "null") ? viewUser.avatar_url : undefined} />
+                                    <AvatarFallback className="text-3xl bg-blue-100 text-blue-700 font-semibold">
                                         {viewUser.initials}
                                     </AvatarFallback>
                                 </Avatar>

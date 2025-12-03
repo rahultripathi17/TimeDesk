@@ -741,7 +741,7 @@ export default function MasterAttendancePage() {
                                                         <TableCell>
                                                             <div className="flex items-center gap-3">
                                                                 <Avatar className="h-8 w-8">
-                                                                    <AvatarImage src={record.profiles.avatar_url || ""} />
+                                                                    <AvatarImage src={(record.profiles.avatar_url && record.profiles.avatar_url !== "NULL" && record.profiles.avatar_url !== "null") ? record.profiles.avatar_url : undefined} />
                                                                     <AvatarFallback className="bg-blue-100 text-blue-700 text-xs">
                                                                         {getInitials(record.profiles.full_name)}
                                                                     </AvatarFallback>
@@ -828,7 +828,7 @@ export default function MasterAttendancePage() {
                                                 <div key={user.id} className="grid grid-cols-[200px_1fr] border-b border-slate-100 hover:bg-slate-50">
                                                     <div className="sticky left-0 z-10 bg-white p-3 flex items-center gap-3 border-r border-slate-200 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)]">
                                                         <Avatar className="h-8 w-8">
-                                                            <AvatarImage src={user.avatar_url || ""} />
+                                                            <AvatarImage src={(user.avatar_url && user.avatar_url !== "NULL" && user.avatar_url !== "null") ? user.avatar_url : undefined} />
                                                             <AvatarFallback className="bg-blue-100 text-blue-700 text-xs">
                                                                 {getInitials(user.full_name)}
                                                             </AvatarFallback>

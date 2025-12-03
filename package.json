@@ -1,6 +1,21 @@
 {
   "name": "TimeDesk",
   "version": "0.1.0",
+  "description": "A comprehensive, role-based attendance and leave management system.",
+  "keywords": [
+    "attendance",
+    "leave-management",
+    "hr-tech",
+    "nextjs",
+    "supabase",
+    "rbac"
+  ],
+  "author": "Rahul Tripathi",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rahultripathi17/TimeDesk.git"
+  },
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",

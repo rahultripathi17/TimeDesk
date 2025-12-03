@@ -5,6 +5,14 @@ TimeDesk is a comprehensive, role-based attendance and leave management system d
 ![TimeDesk Banner](public/timedesk-logo.png)
 *(Note: Replace with a dashboard screenshot)*
 
+## 📌 Project Metadata
+
+-   **Type**: Enterprise Web Application
+-   **Domain**: HR Tech / Workforce Management
+-   **Status**: Active Development
+-   **Target Audience**: Organizations, HR Departments, Managers
+
+
 ## 🚀 Key Features
 
 ### 👥 Role-Based Access Control (RBAC)
@@ -64,8 +72,8 @@ TimeDesk is a comprehensive, role-based attendance and leave management system d
 
 1.  **Clone the repository**
     ```bash
-    git clone https://github.com/yourusername/timedesk.git
-    cd timedesk/client
+    git clone https://github.com/rahultripathi17/TimeDesk
+    cd TimeDesk
     ```
 
 2.  **Install dependencies**
@@ -90,7 +98,8 @@ TimeDesk is a comprehensive, role-based attendance and leave management system d
 ## 📂 Project Structure
 
 ```
-client/
+.
+
 ├── public/             # Static assets (images, manifest.json)
 ├── src/
 │   ├── app/            # Next.js App Router pages
@@ -108,7 +117,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📄 License
 
-This project is licensed under the MIT License.
+This project is proprietary and confidential. All rights reserved.
+
 
 ---
 Developed by **Rahul Tripathi**

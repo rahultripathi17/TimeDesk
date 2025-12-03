@@ -269,8 +269,8 @@ export function TeamAttendanceList({ role }: TeamAttendanceListProps) {
                                     <TableCell>
                                         <div className="flex items-center gap-3">
                                             <Avatar className="h-8 w-8">
-                                                <AvatarImage src={user.avatar_url} />
-                                                <AvatarFallback className="bg-slate-100 text-slate-600 text-xs">
+                                                <AvatarImage src={(user.avatar_url && user.avatar_url !== "NULL" && user.avatar_url !== "null") ? user.avatar_url : undefined} />
+                                                <AvatarFallback className="bg-blue-100 text-blue-700 text-xs">
                                                     {user.initials}
                                                 </AvatarFallback>
                                             </Avatar>

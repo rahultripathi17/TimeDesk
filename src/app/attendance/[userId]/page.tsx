@@ -96,7 +96,7 @@ export default function UserAttendancePage() {
 
                     <div className="flex items-center gap-4">
                         <Avatar className="h-16 w-16 border-2 border-white shadow-sm">
-                            <AvatarImage src={userProfile.avatar_url} />
+                            <AvatarImage src={(userProfile.avatar_url && userProfile.avatar_url !== "NULL" && userProfile.avatar_url !== "null") ? userProfile.avatar_url : undefined} />
                             <AvatarFallback className="bg-blue-100 text-blue-700 text-xl">
                                 {getInitials(userProfile.full_name)}
                             </AvatarFallback>
