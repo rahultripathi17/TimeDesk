@@ -223,6 +223,7 @@ export function TeamAttendanceList({ role }: TeamAttendanceListProps) {
 
     const filteredUsers = users.filter(user =>
         user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.designation?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         user.department?.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
@@ -248,8 +249,7 @@ export function TeamAttendanceList({ role }: TeamAttendanceListProps) {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Member</TableHead>
-                            <TableHead>Role</TableHead>
-                            <TableHead>Department</TableHead>
+                            <TableHead>Designation</TableHead>
                             <TableHead>Today's Status</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -280,13 +280,8 @@ export function TeamAttendanceList({ role }: TeamAttendanceListProps) {
                                             </div>
                                         </div>
                                     </TableCell>
-                                    <TableCell>
-                                        <Badge variant="outline" className="capitalize font-normal">
-                                            {user.role}
-                                        </Badge>
-                                    </TableCell>
                                     <TableCell className="text-sm text-slate-600">
-                                        {user.department || "-"}
+                                        {user.designation || "-"}
                                     </TableCell>
                                     <TableCell>
                                         <Badge
