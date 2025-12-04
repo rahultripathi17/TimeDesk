@@ -100,6 +100,7 @@ export function AttendanceCalendar({ userId }: { userId?: string }) {
     const [records, setRecords] = useState<AttendanceRecord[]>([]);
     const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
     const [workConfig, setWorkConfig] = useState<WorkConfig | null>(null);
+    const [dateOfJoining, setDateOfJoining] = useState<Date | null>(null);
     const [loading, setLoading] = useState(true);
 
     // today (date-only)
@@ -132,15 +133,20 @@ export function AttendanceCalendar({ userId }: { userId?: string }) {
             const monthStartStr = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
             const monthEndStr = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
 
-            // 0. Fetch Work Config
+            // 0. Fetch Work Config and Joining Date
             const { data: profileData } = await supabase
                 .from('profiles')
-                .select('work_config')
+                .select('work_config, date_of_joining')
                 .eq('id', targetUserId)
                 .single();
 
-            if (profileData?.work_config) {
-                setWorkConfig(profileData.work_config as WorkConfig);
+            if (profileData) {
+                if (profileData.work_config) {
+                    setWorkConfig(profileData.work_config as WorkConfig);
+                }
+                if (profileData.date_of_joining) {
+                    setDateOfJoining(parseISO(profileData.date_of_joining));
+                }
             }
 
             // 1. Fetch Attendance
@@ -256,6 +262,11 @@ export function AttendanceCalendar({ userId }: { userId?: string }) {
             const dateStr = format(day, 'yyyy-MM-dd');
             const rec = records.find(r => r.date === dateStr);
 
+            // Check if before joining
+            if (dateOfJoining && isBefore(day, startOfDay(dateOfJoining))) {
+                return; // Skip stats for days before joining
+            }
+
             if (rec) {
                 if (rec.status === "OFFICE") present++;
                 else if (rec.status === "REMOTE") wfh++;
@@ -280,7 +291,7 @@ export function AttendanceCalendar({ userId }: { userId?: string }) {
         });
 
         return { present, wfh, leave, absent, halfDays };
-    }, [records, monthStart, monthEnd, today, workConfig]);
+    }, [records, monthStart, monthEnd, today, workConfig, dateOfJoining]);
 
     const getStyle = (status: string, color?: string): StatusStyle | undefined => {
         if (defaultStyles[status]) return defaultStyles[status];
@@ -315,8 +326,13 @@ export function AttendanceCalendar({ userId }: { userId?: string }) {
             // 🔸 Auto-ABSENT / OFF logic:
             let effectiveStyle = style;
             let isAbsent = false;
+            let isBeforeJoining = false;
 
-            if (!style && inMonth) {
+            if (dateOfJoining && isBefore(day, startOfDay(dateOfJoining))) {
+                isBeforeJoining = true;
+            }
+
+            if (!style && inMonth && !isBeforeJoining) {
                 if (!isWorkingDay(day)) {
                     effectiveStyle = defaultStyles.OFF;
                 } else if (isBefore(day, today)) {
@@ -403,7 +419,7 @@ export function AttendanceCalendar({ userId }: { userId?: string }) {
 
                     {!effectiveStyle && inMonth && (
                         <div className="mt-1.5 text-[10px] text-slate-400">
-                            -
+                            {isBeforeJoining ? "Not Joined" : "-"}
                         </div>
                     )}
                 </div>
