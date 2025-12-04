@@ -30,6 +30,9 @@ export default function LeaveApprovalPage() {
     const [leaves, setLeaves] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
+    const [pendingPage, setPendingPage] = useState(1);
+    const [historyPage, setHistoryPage] = useState(1);
+    const ITEMS_PER_PAGE = 10;
 
     const [userRole, setUserRole] = useState<string>("manager");
 
@@ -79,6 +82,15 @@ export default function LeaveApprovalPage() {
 
     const pendingLeaves = leaves.filter(l => l.status === 'pending');
     const historyLeaves = leaves.filter(l => l.status !== 'pending');
+
+    // Pagination Logic
+    const totalPendingPages = Math.ceil(pendingLeaves.length / ITEMS_PER_PAGE);
+    const pendingStartIndex = (pendingPage - 1) * ITEMS_PER_PAGE;
+    const paginatedPendingLeaves = pendingLeaves.slice(pendingStartIndex, pendingStartIndex + ITEMS_PER_PAGE);
+
+    const totalHistoryPages = Math.ceil(historyLeaves.length / ITEMS_PER_PAGE);
+    const historyStartIndex = (historyPage - 1) * ITEMS_PER_PAGE;
+    const paginatedHistoryLeaves = historyLeaves.slice(historyStartIndex, historyStartIndex + ITEMS_PER_PAGE);
 
     const getDuration = (leave: any) => {
         if (leave.type?.toLowerCase() === 'half day' && leave.session) {
@@ -218,8 +230,8 @@ export default function LeaveApprovalPage() {
                                                         Loading...
                                                     </TableCell>
                                                 </TableRow>
-                                            ) : pendingLeaves.length > 0 ? (
-                                                pendingLeaves.map((leave) => (
+                                            ) : paginatedPendingLeaves.length > 0 ? (
+                                                paginatedPendingLeaves.map((leave) => (
                                                     <TableRow key={leave.id}>
                                                         <TableCell>
                                                             <div className="flex flex-col">
@@ -298,14 +310,39 @@ export default function LeaveApprovalPage() {
                                             )}
                                         </TableBody>
                                     </Table>
+
+                                    {/* Pending Pagination Controls (Desktop) */}
+                                    {totalPendingPages > 1 && (
+                                        <div className="flex items-center justify-end space-x-2 py-4">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setPendingPage((prev) => Math.max(prev - 1, 1))}
+                                                disabled={pendingPage === 1}
+                                            >
+                                                Previous
+                                            </Button>
+                                            <div className="text-sm text-slate-600">
+                                                Page {pendingPage} of {totalPendingPages}
+                                            </div>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setPendingPage((prev) => Math.min(prev + 1, totalPendingPages))}
+                                                disabled={pendingPage === totalPendingPages}
+                                            >
+                                                Next
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Mobile Card View */}
                                 <div className="md:hidden space-y-4">
                                     {loading ? (
                                         <div className="text-center py-8 text-slate-500">Loading...</div>
-                                    ) : pendingLeaves.length > 0 ? (
-                                        pendingLeaves.map((leave) => (
+                                    ) : paginatedPendingLeaves.length > 0 ? (
+                                        paginatedPendingLeaves.map((leave) => (
                                             <div key={leave.id} className="border rounded-lg p-4 space-y-4 bg-white shadow-sm">
                                                 <div className="flex items-start justify-between">
                                                     <div className="flex items-center gap-3">
@@ -370,6 +407,32 @@ export default function LeaveApprovalPage() {
                                             <Check className="h-8 w-8 text-green-500 bg-green-100 rounded-full p-1 mx-auto mb-2" />
                                             <p>All caught up! No pending requests.</p>
                                         </div>
+
+                                    )}
+
+                                    {/* Pending Pagination Controls (Mobile) */}
+                                    {totalPendingPages > 1 && (
+                                        <div className="flex items-center justify-center space-x-2 py-4">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setPendingPage((prev) => Math.max(prev - 1, 1))}
+                                                disabled={pendingPage === 1}
+                                            >
+                                                Previous
+                                            </Button>
+                                            <div className="text-sm text-slate-600">
+                                                {pendingPage} / {totalPendingPages}
+                                            </div>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setPendingPage((prev) => Math.min(prev + 1, totalPendingPages))}
+                                                disabled={pendingPage === totalPendingPages}
+                                            >
+                                                Next
+                                            </Button>
+                                        </div>
                                     )}
                                 </div>
                             </CardContent>
@@ -402,8 +465,8 @@ export default function LeaveApprovalPage() {
                                                     Loading...
                                                 </TableCell>
                                             </TableRow>
-                                        ) : historyLeaves.length > 0 ? (
-                                            historyLeaves.map((leave) => (
+                                        ) : paginatedHistoryLeaves.length > 0 ? (
+                                            paginatedHistoryLeaves.map((leave) => (
                                                 <TableRow key={leave.id}>
                                                     <TableCell>
                                                         <div className="flex flex-col">
@@ -475,11 +538,36 @@ export default function LeaveApprovalPage() {
                                         )}
                                     </TableBody>
                                 </Table>
+
+                                {/* History Pagination Controls */}
+                                {totalHistoryPages > 1 && (
+                                    <div className="flex items-center justify-end space-x-2 py-4">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setHistoryPage((prev) => Math.max(prev - 1, 1))}
+                                            disabled={historyPage === 1}
+                                        >
+                                            Previous
+                                        </Button>
+                                        <div className="text-sm text-slate-600">
+                                            Page {historyPage} of {totalHistoryPages}
+                                        </div>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setHistoryPage((prev) => Math.min(prev + 1, totalHistoryPages))}
+                                            disabled={historyPage === totalHistoryPages}
+                                        >
+                                            Next
+                                        </Button>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     </TabsContent>
                 </Tabs>
             </div>
-        </AppShell>
+        </AppShell >
     );
 }

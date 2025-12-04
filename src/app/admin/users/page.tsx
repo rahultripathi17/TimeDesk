@@ -51,6 +51,15 @@ export default function UsersListPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [departmentFilter, setDepartmentFilter] = useState("all");
     const [departmentsList, setDepartmentsList] = useState<string[]>([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalRecords, setTotalRecords] = useState(0);
+    const [stats, setStats] = useState({
+        total: 0,
+        managers: 0,
+        employees: 0,
+        hr: 0
+    });
+    const ITEMS_PER_PAGE = 10;
 
     // Action States
     const [viewUser, setViewUser] = useState<any | null>(null);
@@ -58,9 +67,34 @@ export default function UsersListPage() {
     const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
-        fetchUsers();
         fetchDepartments();
+        fetchStats();
     }, []);
+
+    useEffect(() => {
+        fetchUsers();
+    }, [currentPage, searchQuery, departmentFilter]);
+
+    const fetchStats = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('role');
+
+            if (error) throw error;
+
+            if (data) {
+                setStats({
+                    total: data.length,
+                    managers: data.filter(u => u.role === 'manager').length,
+                    employees: data.filter(u => u.role === 'employee').length,
+                    hr: data.filter(u => u.role === 'hr').length
+                });
+            }
+        } catch (error) {
+            console.error('Error fetching stats:', error);
+        }
+    };
 
     const fetchDepartments = async () => {
         try {
@@ -83,7 +117,8 @@ export default function UsersListPage() {
     const fetchUsers = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
+
+            let query = supabase
                 .from('profiles')
                 .select(`
                     *,
@@ -99,7 +134,27 @@ export default function UsersListPage() {
                         type,
                         session
                     )
-                `);
+                `, { count: 'exact' });
+
+            // Apply filters
+            if (searchQuery) {
+                // Note: This is a simple OR search. For more complex search, we might need a different approach or RPC.
+                // Supabase doesn't support OR across different columns easily with the JS client in one go without raw filters.
+                // We'll use 'or' filter.
+                query = query.or(`full_name.ilike.%${searchQuery}%,username.ilike.%${searchQuery}%`);
+            }
+
+            if (departmentFilter !== 'all') {
+                query = query.eq('department', departmentFilter);
+            }
+
+            // Apply pagination
+            const from = (currentPage - 1) * ITEMS_PER_PAGE;
+            const to = from + ITEMS_PER_PAGE - 1;
+
+            const { data, error, count } = await query
+                .range(from, to)
+                .order('created_at', { ascending: false });
 
             if (error) throw error;
 
@@ -180,6 +235,7 @@ export default function UsersListPage() {
             });
 
             setUsers(processedUsers);
+            if (count !== null) setTotalRecords(count);
         } catch (error) {
             console.error('Error fetching users:', error);
         } finally {
@@ -224,21 +280,20 @@ export default function UsersListPage() {
         }
     };
 
-    // Filter users
-    const filteredUsers = users.filter((user) => {
-        const matchesSearch =
-            user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            user.username.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesDepartment =
-            departmentFilter === "all" || user.department === departmentFilter;
-        return matchesSearch && matchesDepartment;
-    });
+    // Reset to first page when search/filter changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, departmentFilter]);
+
+    const totalPages = Math.ceil(totalRecords / ITEMS_PER_PAGE);
+    // const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    // const paginatedUsers = filteredUsers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     // Compute stats
-    const totalUsers = users.length;
-    const managersCount = users.filter((u) => u.role === "manager").length;
-    const employeesCount = users.filter((u) => u.role === "employee").length;
-    const hrCount = users.filter((u) => u.role === "hr").length;
+    // const totalUsers = users.length;
+    // const managersCount = users.filter((u) => u.role === "manager").length;
+    // const employeesCount = users.filter((u) => u.role === "employee").length;
+    // const hrCount = users.filter((u) => u.role === "hr").length;
 
     const getStatusColor = (status: string) => {
         switch (status) {
@@ -294,7 +349,8 @@ export default function UsersListPage() {
                 </div>
 
                 {/* Stats Cards */}
-                <div className="grid gap-4 md:grid-cols-4 mb-6">
+                {/* Stats Cards */}
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-4 mb-6">
                     <Card>
                         <CardContent className="p-4 flex items-center gap-4">
                             <div className="p-2 bg-blue-50 rounded-full">
@@ -302,7 +358,7 @@ export default function UsersListPage() {
                             </div>
                             <div>
                                 <p className="text-xs font-medium text-slate-500">Total Users</p>
-                                <h3 className="text-xl font-bold text-slate-900">{totalUsers}</h3>
+                                <h3 className="text-xl font-bold text-slate-900">{stats.total}</h3>
                             </div>
                         </CardContent>
                     </Card>
@@ -313,7 +369,7 @@ export default function UsersListPage() {
                             </div>
                             <div>
                                 <p className="text-xs font-medium text-slate-500">Managers</p>
-                                <h3 className="text-xl font-bold text-slate-900">{managersCount}</h3>
+                                <h3 className="text-xl font-bold text-slate-900">{stats.managers}</h3>
                             </div>
                         </CardContent>
                     </Card>
@@ -324,7 +380,7 @@ export default function UsersListPage() {
                             </div>
                             <div>
                                 <p className="text-xs font-medium text-slate-500">Employees</p>
-                                <h3 className="text-xl font-bold text-slate-900">{employeesCount}</h3>
+                                <h3 className="text-xl font-bold text-slate-900">{stats.employees}</h3>
                             </div>
                         </CardContent>
                     </Card>
@@ -335,7 +391,7 @@ export default function UsersListPage() {
                             </div>
                             <div>
                                 <p className="text-xs font-medium text-slate-500">HR</p>
-                                <h3 className="text-xl font-bold text-slate-900">{hrCount}</h3>
+                                <h3 className="text-xl font-bold text-slate-900">{stats.hr}</h3>
                             </div>
                         </CardContent>
                     </Card>
@@ -369,7 +425,7 @@ export default function UsersListPage() {
                             </Select>
                         </div>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -382,8 +438,8 @@ export default function UsersListPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredUsers.length > 0 ? (
-                                    filteredUsers.map((user) => (
+                                {users.length > 0 ? (
+                                    users.map((user) => (
                                         <TableRow key={user.id}>
                                             <TableCell className="font-medium">
                                                 <div className="flex items-center gap-3">
@@ -454,6 +510,30 @@ export default function UsersListPage() {
                             </TableBody>
                         </Table>
                     </CardContent>
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                        <div className="flex items-center justify-end space-x-2 p-4 border-t">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                                disabled={currentPage === 1}
+                            >
+                                Previous
+                            </Button>
+                            <div className="text-sm text-slate-600">
+                                Page {currentPage} of {totalPages}
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                                disabled={currentPage === totalPages}
+                            >
+                                Next
+                            </Button>
+                        </div>
+                    )}
                 </Card>
             </div>
 

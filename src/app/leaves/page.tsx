@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
 export default function MyLeavesPage() {
     const [leaves, setLeaves] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 10;
 
     useEffect(() => {
         fetchLeaves();
@@ -58,6 +60,10 @@ export default function MyLeavesPage() {
                 return "bg-slate-100 text-slate-700 hover:bg-slate-100";
         }
     };
+
+    const totalPages = Math.ceil(leaves.length / ITEMS_PER_PAGE);
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const paginatedLeaves = leaves.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     return (
         <AppShell role="employee">
@@ -100,8 +106,8 @@ export default function MyLeavesPage() {
                                             Loading...
                                         </TableCell>
                                     </TableRow>
-                                ) : leaves.length > 0 ? (
-                                    leaves.map((leave) => (
+                                ) : paginatedLeaves.length > 0 ? (
+                                    paginatedLeaves.map((leave) => (
                                         <TableRow key={leave.id}>
                                             <TableCell className="font-medium">
                                                 <span>{leave.type}</span>
@@ -155,6 +161,31 @@ export default function MyLeavesPage() {
                                 )}
                             </TableBody>
                         </Table>
+
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-end space-x-2 py-4">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                                    disabled={currentPage === 1}
+                                >
+                                    Previous
+                                </Button>
+                                <div className="text-sm text-slate-600">
+                                    Page {currentPage} of {totalPages}
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                                    disabled={currentPage === totalPages}
+                                >
+                                    Next
+                                </Button>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>

@@ -36,6 +36,8 @@ type Department = {
 export default function DepartmentsPage() {
     const [departments, setDepartments] = useState<Department[]>([]);
     const [loading, setLoading] = useState(true);
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 10;
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -106,6 +108,10 @@ export default function DepartmentsPage() {
             setLoading(false);
         }
     };
+
+    const totalPages = Math.ceil(departments.length / ITEMS_PER_PAGE);
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const paginatedDepartments = departments.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     const handleAddDepartment = async () => {
         if (!newDepartmentName.trim()) return;
@@ -283,7 +289,7 @@ export default function DepartmentsPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {departments.map((dept) => (
+                                    {paginatedDepartments.map((dept) => (
                                         <TableRow key={dept.name}>
                                             <TableCell className="font-medium">{dept.name}</TableCell>
                                             <TableCell>{dept.peopleCount}</TableCell>
@@ -314,6 +320,31 @@ export default function DepartmentsPage() {
                                     ))}
                                 </TableBody>
                             </Table>
+                        )}
+
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-end space-x-2 py-4">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                                    disabled={currentPage === 1}
+                                >
+                                    Previous
+                                </Button>
+                                <div className="text-sm text-slate-600">
+                                    Page {currentPage} of {totalPages}
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                                    disabled={currentPage === totalPages}
+                                >
+                                    Next
+                                </Button>
+                            </div>
                         )}
                     </CardContent>
                 </Card>
