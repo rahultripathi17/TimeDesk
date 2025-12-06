@@ -431,7 +431,7 @@ export default function ApplyLeavePage() {
                                             </div>
                                         )}
 
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                             <div className="space-y-2">
                                                 <Label htmlFor="startDate">Start Date</Label>
                                                 <Input
