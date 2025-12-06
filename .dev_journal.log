@@ -17,3 +17,4 @@
 [2025-11-28 15:26:44 +0530] Fix bug where timer desyncs after app is minimized
 [2025-12-01 10:56:21 +0530] Setup baseline MVVM package structure
 [2025-12-03 13:30:50 +0530] Add date range picker for leave requests
+[2025-12-06 09:29:57 +0530] Handle edge case for overnight shifts passing midnight
