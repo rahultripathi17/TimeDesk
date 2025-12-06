@@ -19,6 +19,11 @@ import {
   UserPlus,
   LogOut,
   Megaphone,
+  ClipboardCheck,
+  RotateCcw,
+  BarChart3,
+  CalendarPlus,
+  Scale,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -52,11 +57,11 @@ const employeeExtra: NavItem[] = [
   { label: "Team Attendance", href: "/employee/team", icon: Users },
   {
     label: "Leaves",
-    href: "/leaves/apply",
-    icon: FileSpreadsheet,
+    href: "/leaves/apply", // Or keep parent clickable?
+    icon: CalendarPlus,
     children: [
-      { label: "Apply Leave", href: "/leaves/apply", icon: FileSpreadsheet },
-      { label: "Leave Balance", href: "/leaves/balance", icon: FileSpreadsheet },
+      { label: "Apply Leave", href: "/leaves/apply", icon: CalendarPlus },
+      { label: "Leave Balance", href: "/leaves/balance", icon: Scale },
     ],
   },
 ];
@@ -66,11 +71,11 @@ const managerExtra: NavItem[] = [
   {
     label: "Leaves",
     href: "/admin/leaves",
-    icon: FileSpreadsheet,
+    icon: CalendarPlus,
     children: [
-      { label: "Apply Leave", href: "/leaves/apply", icon: FileSpreadsheet },
-      { label: "Leave Balance", href: "/leaves/balance", icon: FileSpreadsheet },
-      { label: "Approvals", href: "/admin/leaves", icon: FileSpreadsheet, exact: true },
+      { label: "Apply Leave", href: "/leaves/apply", icon: CalendarPlus },
+      { label: "Leave Balance", href: "/leaves/balance", icon: Scale },
+      { label: "Approvals", href: "/admin/leaves", icon: ClipboardCheck, exact: true },
     ],
   },
 ];
@@ -82,14 +87,14 @@ const hrExtra: NavItem[] = [
   {
     label: "Leaves",
     href: "/leaves/apply",
-    icon: FileSpreadsheet,
+    icon: CalendarPlus,
     children: [
-      { label: "Apply Leave", href: "/leaves/apply", icon: FileSpreadsheet },
-      { label: "Leave Balance", href: "/leaves/balance", icon: FileSpreadsheet },
-      { label: "Approvals", href: "/admin/leaves", icon: FileSpreadsheet, exact: true },
+      { label: "Apply Leave", href: "/leaves/apply", icon: CalendarPlus },
+      { label: "Leave Balance", href: "/leaves/balance", icon: Scale },
+      { label: "Approvals", href: "/admin/leaves", icon: ClipboardCheck, exact: true },
     ],
   },
-  { label: "Reports", href: "/hr/reports", icon: FileSpreadsheet },
+  { label: "Reports", href: "/hr/reports", icon: BarChart3 },
   { label: "Policies", href: "/hr/policies", icon: ShieldCheck },
 ];
 
@@ -101,14 +106,14 @@ const adminExtra: NavItem[] = [
   {
     label: "Leaves",
     href: "/admin/leaves",
-    icon: FileSpreadsheet,
+    icon: CalendarPlus,
     children: [
       { label: "Limits", href: "/admin/leaves/limits", icon: ShieldCheck },
-      { label: "Approvals", href: "/admin/leaves", icon: FileSpreadsheet, exact: true },
-      { label: "Reset Balances", href: "/admin/leaves/reset", icon: FileSpreadsheet },
+      { label: "Approvals", href: "/admin/leaves", icon: ClipboardCheck, exact: true },
+      { label: "Reset Balances", href: "/admin/leaves/reset", icon: RotateCcw },
     ],
   },
-  { label: "Reports", href: "/admin/reports", icon: FileSpreadsheet },
+  { label: "Reports", href: "/admin/reports", icon: BarChart3 },
   { label: "Notice Board", href: "/admin/settings", icon: Megaphone },
 ];
 export function navForRole(role: Role): NavItem[] {
