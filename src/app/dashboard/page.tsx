@@ -432,7 +432,7 @@ export default function DashboardPage() {
         {role !== 'admin' && (
           <section className="grid gap-4 md:grid-cols-2 mb-6">
             {/* Today's Status */}
-            <Card className="md:col-span-1">
+            <Card className="md:col-span-1 transition-all hover:shadow-md">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Home className="h-5 w-5" />
@@ -523,7 +523,7 @@ export default function DashboardPage() {
             </Card>
 
             {/* Work Schedule */}
-            <Card className="md:col-span-1">
+            <Card className="md:col-span-1 transition-all hover:shadow-md">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Clock className="h-5 w-5" />
