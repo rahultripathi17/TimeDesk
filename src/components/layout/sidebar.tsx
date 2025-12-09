@@ -272,7 +272,7 @@ export function DesktopSidebar({ role }: { role: Role }) {
             onClick={() => toggleExpand(item.label)}
             title={!isExpanded ? item.label : undefined}
           >
-            <div className="flex w-full items-center justify-between">
+            <div className={cn("flex w-full items-center", !isExpanded ? "justify-center" : "justify-between")}>
               <div className="flex items-center gap-3 relative">
                 <Icon className="h-5 w-5 shrink-0" />
                 {/* Collapsed Badge (Parent) */}
