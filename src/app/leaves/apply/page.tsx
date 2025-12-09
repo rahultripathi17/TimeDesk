@@ -263,7 +263,7 @@ export default function ApplyLeavePage() {
     };
 
     return (
-        <AppShell role="employee">
+        <AppShell role={(userRole as "employee" | "manager" | "hr" | "admin") || "employee"}>
             <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:py-8">
                 <header className="mb-6">
                     <h1 className="text-lg font-semibold text-slate-900">Leave Management</h1>

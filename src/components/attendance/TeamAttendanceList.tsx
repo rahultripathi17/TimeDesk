@@ -28,21 +28,31 @@ import { useRouter } from "next/navigation";
 
 interface TeamAttendanceListProps {
     role: "admin" | "hr" | "manager" | "employee";
+    departmentFilter?: string | null;
+    headerAction?: React.ReactNode;
 }
 
-export function TeamAttendanceList({ role }: TeamAttendanceListProps) {
+export function TeamAttendanceList({ role, departmentFilter: initialDepartmentFilter, headerAction }: TeamAttendanceListProps) {
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [currentPage, setCurrentPage] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
     const ITEMS_PER_PAGE = 10;
+    
+    const [departmentFilter, setDepartmentFilter] = useState<string | null>(initialDepartmentFilter || null);
 
     const router = useRouter();
+    
+    useEffect(() => {
+        setDepartmentFilter(initialDepartmentFilter || null);
+        setCurrentPage(1); 
+    }, [initialDepartmentFilter]);
 
     useEffect(() => {
         fetchCurrentUserAndTeam();
-    }, []);
+    }, [departmentFilter, currentPage]);
 
     const fetchCurrentUserAndTeam = async () => {
         try {
@@ -51,56 +61,64 @@ export function TeamAttendanceList({ role }: TeamAttendanceListProps) {
             if (!user) return;
 
             // 1. Get Current User Profile
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id)
-                .single();
+            if (!currentUser) {
+                 const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', user.id)
+                    .single();
+                 if (profile) setCurrentUser(profile);
+            }
 
-            if (!profile) return;
-            setCurrentUser(profile);
-
-            // 2. Build Query based on Role
+            // 2. Build Query
             let query = supabase
                 .from('profiles')
                 .select(`
-          *,
-          attendance (
-            status,
-            date
-          ),
-          leaves!user_id (
-            status,
-            start_date,
-            end_date,
-            type,
-            session
-          )
-        `);
+                  *,
+                  attendance (
+                    status,
+                    date
+                  ),
+                  leaves!user_id (
+                    status,
+                    start_date,
+                    end_date,
+                    type,
+                    session
+                  )
+                `, { count: 'exact' });
 
-            // Apply Role-Based Filters
-            if (role === 'employee') {
-                // Employees see their department
-                if (profile.department) {
-                    query = query.eq('department', profile.department);
-                }
+            // Application Filters
+             if (role === 'employee') {
+                 if (currentUser?.department) query = query.eq('department', currentUser.department);
             } else if (role === 'manager') {
-                // Managers see their department OR people reporting to them
-                if (profile.department) {
-                    query = query.eq('department', profile.department);
-                }
+                 if (currentUser?.department) query = query.eq('department', currentUser.department);
+            } else if (role === 'hr' || role === 'admin') {
+                if (departmentFilter) query = query.eq('department', departmentFilter);
             }
-            // Admin and HR see everyone (no filter added)
 
-            const { data: teamData, error } = await query;
+            // Search Query (Client side filtering is tricky with server pagination for text search without Full Text Search on DB)
+            // Ideally we use server side ilike for search too.
+            if (searchQuery) {
+                query = query.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
+            }
+
+            // Pagination
+            const from = (currentPage - 1) * ITEMS_PER_PAGE;
+            const to = from + ITEMS_PER_PAGE - 1;
+            query = query.range(from, to);
+
+            const { data: teamData, error, count } = await query;
 
             if (error) throw error;
+            setTotalCount(count || 0);
 
-            // 3. Process Data (Add Today's Status)
+            // 3. Process Data checking logic...
             const today = format(new Date(), 'yyyy-MM-dd');
+            // ... (keep existing processing logic)
 
             const processedUsers = teamData.map((u: any) => {
-                // Check Attendance
+                 // Check Attendance
                 const todayAttendance = u.attendance?.find((a: any) => a.date === today);
                 let status = 'absent'; // Default
 
@@ -112,54 +130,45 @@ export function TeamAttendanceList({ role }: TeamAttendanceListProps) {
                 );
 
                 if (activeLeave) {
-                    // Check for 'Half Day' type OR presence of session
                     if (activeLeave.type === 'Half Day' || activeLeave.session) {
-                        const now = new Date();
-                        const currentTimeStr = format(now, 'HH:mm');
+                         const now = new Date();
+                         const currentTimeStr = format(now, 'HH:mm');
+                         
+                         let midpointTime = "13:00"; 
+                         let displayTime = "";
+                         let statusLabel = "";
 
-                        let midpointTime = "13:00"; // Default fallback
-                        let statusLabel = "";
-                        let displayTime = "";
+                         if (u.work_config?.fixed?.start_time && u.work_config?.fixed?.end_time) {
+                             // ... existing logic for duration ...
+                              const start = u.work_config.fixed.start_time;
+                              const end = u.work_config.fixed.end_time;
+                              const [startH, startM] = start.split(':').map(Number);
+                              const [endH, endM] = end.split(':').map(Number);
+                              const startDate = new Date(); startDate.setHours(startH, startM, 0, 0);
+                              const endDate = new Date(); endDate.setHours(endH, endM, 0, 0);
+                              const midpointDate = new Date((startDate.getTime() + endDate.getTime()) / 2);
+                              midpointTime = format(midpointDate, 'HH:mm');
+                              displayTime = format(midpointDate, 'hh:mm a');
+                         }
 
-                        // Dynamic Calculation if work_config exists
-                        if (u.work_config?.fixed?.start_time && u.work_config?.fixed?.end_time) {
-                            const start = u.work_config.fixed.start_time;
-                            const end = u.work_config.fixed.end_time;
-
-                            const [startH, startM] = start.split(':').map(Number);
-                            const [endH, endM] = end.split(':').map(Number);
-
-                            const startDate = new Date(); startDate.setHours(startH, startM, 0, 0);
-                            const endDate = new Date(); endDate.setHours(endH, endM, 0, 0);
-
-                            const midpointDate = new Date((startDate.getTime() + endDate.getTime()) / 2);
-                            midpointTime = format(midpointDate, 'HH:mm');
-                            displayTime = format(midpointDate, 'hh:mm a');
-                        }
-
-                        if (activeLeave.session === 'first_half') {
-                            // Scenario B: First Half Leave (Late Start)
-                            if (currentTimeStr < midpointTime) {
-                                status = 'leave_first_half';
-                                if (displayTime) statusLabel = `Available after ${displayTime}`;
-                            } else {
-                                status = 'available_after_leave';
-                            }
-                        } else if (activeLeave.session === 'second_half') {
-                            // Scenario C: Second Half Leave (Early Exit)
-                            if (currentTimeStr < midpointTime) {
-                                status = 'available_before_leave';
-                                if (displayTime) statusLabel = `Available till ${displayTime}`;
-                            } else {
-                                status = 'leave_second_half';
-                            }
-                        } else {
-                            status = 'leave';
-                        }
-
-                        // Attach custom label to user object for display
-                        u.statusLabel = statusLabel;
-
+                         if (activeLeave.session === 'first_half') {
+                             if (currentTimeStr < midpointTime) {
+                                 status = 'leave_first_half';
+                                 if (displayTime) statusLabel = `Available after ${displayTime}`;
+                             } else {
+                                 status = 'available_after_leave';
+                             }
+                         } else if (activeLeave.session === 'second_half') {
+                             if (currentTimeStr < midpointTime) {
+                                  status = 'available_before_leave';
+                                  if (displayTime) statusLabel = `Available till ${displayTime}`;
+                             } else {
+                                  status = 'leave_second_half';
+                             }
+                         } else {
+                             status = 'leave';
+                         }
+                         u.statusLabel = statusLabel;
                     } else {
                         status = 'leave';
                     }
@@ -175,14 +184,13 @@ export function TeamAttendanceList({ role }: TeamAttendanceListProps) {
             });
 
             setUsers(processedUsers);
-
         } catch (error) {
-            console.error("Error fetching team:", error);
+            console.error(error);
         } finally {
             setLoading(false);
         }
     };
-
+    
     const getInitials = (name: string) => {
         if (!name) return "U";
         return name
@@ -198,10 +206,10 @@ export function TeamAttendanceList({ role }: TeamAttendanceListProps) {
             case "available": return "bg-green-100 text-green-700";
             case "remote": return "bg-blue-100 text-blue-700";
             case "leave": return "bg-amber-100 text-amber-700";
-            case "leave_first_half": return "bg-amber-100 text-amber-700"; // Available after 1:00 PM (Amber)
-            case "leave_second_half": return "bg-amber-100 text-amber-700"; // On Half Day Leave (Amber)
-            case "available_after_leave": return "bg-green-100 text-green-700"; // Available (Green)
-            case "available_before_leave": return "bg-green-100 text-green-700"; // Available till 1:00 PM (Green)
+            case "leave_first_half": return "bg-amber-100 text-amber-700";
+            case "leave_second_half": return "bg-amber-100 text-amber-700";
+            case "available_after_leave": return "bg-green-100 text-green-700";
+            case "available_before_leave": return "bg-green-100 text-green-700";
             case "absent": return "bg-red-100 text-red-700";
             default: return "bg-slate-100 text-slate-700";
         }
@@ -214,29 +222,22 @@ export function TeamAttendanceList({ role }: TeamAttendanceListProps) {
             case "available": return "Working from Office";
             case "remote": return "Working Remotely";
             case "leave": return "On Leave";
-            case "leave_first_half": return "Available after 1:00 PM"; // Fallback
+            case "leave_first_half": return "Available after 1:00 PM";
             case "leave_second_half": return "On Half Day Leave";
             case "available_after_leave": return "Available";
-            case "available_before_leave": return "Available till 1:00 PM"; // Fallback
+            case "available_before_leave": return "Available till 1:00 PM";
             case "absent": return "Absent";
             default: return user.status;
         }
     };
 
-    const filteredUsers = users.filter(user =>
-        user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.designation?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.department?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    // Filter Logic Removed (Done on Server), so filteredUsers is just users
+    const filteredUsers = users; 
+    const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
-    // Reset to first page when search changes
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [searchQuery]);
-
-    const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const paginatedUsers = filteredUsers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    // Since we fetch only the page we need, paginatedUsers is just filteredUsers (which is 'users')
+    const paginatedUsers = filteredUsers;
 
     const getDepartmentSummary = () => {
         if (role === 'employee' || role === 'manager') {
@@ -257,13 +258,19 @@ export function TeamAttendanceList({ role }: TeamAttendanceListProps) {
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
                 </div>
-                <div className="text-sm text-slate-500">
-                    <span className="font-medium text-slate-700 mr-4">{getDepartmentSummary()}</span>
-                    Total Members: {filteredUsers.length}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full sm:w-auto text-sm text-slate-500">
+                    {headerAction ? (
+                        <div className="w-full sm:w-auto">{headerAction}</div>
+                    ) : (
+                        <span className="font-medium text-slate-700 hidden sm:inline">
+                            {departmentFilter ? `Department: ${departmentFilter}` : getDepartmentSummary()}
+                        </span>
+                    )}
+                    <span className="whitespace-nowrap text-right sm:text-left">Total Members: {totalCount}</span>
                 </div>
             </div>
 
-            <div className="rounded-md border">
+            <div className="rounded-md border overflow-x-auto">
                 <Table>
                     <TableHeader>
                         <TableRow>

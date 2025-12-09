@@ -25,6 +25,7 @@ import {
   CalendarPlus,
   Scale,
   MapPin,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -88,7 +89,6 @@ const managerExtra: NavItem[] = [
 
 const hrExtra: NavItem[] = [
   { label: "My Attendance", href: "/dashboard/attendance", icon: CalendarDays },
-  { label: "All Attendance", href: "/hr/attendance", icon: CalendarDays },
   { label: "Teams & Depts", href: "/hr/teams", icon: Users },
   {
     label: "Leaves",
@@ -117,7 +117,8 @@ const adminExtra: NavItem[] = [
     icon: UserPlus,
     exact: true,
   },
-  { label: "Departments", href: "/admin/departments", icon: Users },
+  { label: "Teams & Depts", href: "/admin/teams", icon: Users },
+  { label: "Add Department", href: "/admin/departments", icon: Building2 },
   { label: "Office Locations", href: "/admin/locations", icon: MapPin },
   { label: "Master Attendance", href: "/admin/attendance", icon: CalendarDays },
   {

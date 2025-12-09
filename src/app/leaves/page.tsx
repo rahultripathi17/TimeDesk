@@ -22,6 +22,7 @@ export default function MyLeavesPage() {
     const [leaves, setLeaves] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
+    const [userRole, setUserRole] = useState<string>("employee");
     const ITEMS_PER_PAGE = 10;
 
     useEffect(() => {
@@ -32,6 +33,15 @@ export default function MyLeavesPage() {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
+
+            // Fetch Role
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', user.id)
+                .single();
+            
+            if (profile?.role) setUserRole(profile.role);
 
             const { data, error } = await supabase
                 .from('leaves')
@@ -66,7 +76,7 @@ export default function MyLeavesPage() {
     const paginatedLeaves = leaves.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     return (
-        <AppShell role="employee">
+        <AppShell role={(userRole as "employee" | "manager" | "hr" | "admin") || "employee"}>
             <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:py-8">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                     <div>

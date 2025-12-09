@@ -20,6 +20,7 @@ export default function LeaveBalancePage() {
     const [loading, setLoading] = useState(true);
     const [balances, setBalances] = useState<LeaveBalance[]>([]);
     const [department, setDepartment] = useState<string | null>(null);
+    const [userRole, setUserRole] = useState<string>("employee");
 
     useEffect(() => {
         fetchBalances();
@@ -30,10 +31,10 @@ export default function LeaveBalancePage() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            // 1. Get User Department
+            // 1. Get User Department & Role
             const { data: profile } = await supabase
                 .from('profiles')
-                .select('department')
+                .select('department, role')
                 .eq('id', user.id)
                 .single();
 
@@ -42,6 +43,7 @@ export default function LeaveBalancePage() {
                 return;
             }
             setDepartment(profile.department);
+            if (profile.role) setUserRole(profile.role);
 
             // 2. Get Department Limits
             const limitsResponse = await fetch(`/api/admin/leaves/limits?department=${profile.department}`);
@@ -116,7 +118,7 @@ export default function LeaveBalancePage() {
     };
 
     return (
-        <AppShell role="employee">
+        <AppShell role={(userRole as "employee" | "manager" | "hr" | "admin") || "employee"}>
             <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:py-8">
                 <div className="mb-6">
                     <h1 className="text-lg font-semibold text-slate-900">Leave Balances</h1>
