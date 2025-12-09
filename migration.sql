@@ -213,3 +213,54 @@ create policy "Only admins can delete leave limits."
 insert into public.system_settings (key, value)
 values ('common_info', 'Welcome to the Notice Board! Important announcements will appear here.')
 on conflict (key) do nothing;
+
+-- 13. Office Locations Table
+create table public.office_locations (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  latitude double precision not null,
+  longitude double precision not null,
+  radius integer not null default 100, -- in meters
+  created_at timestamptz default now()
+);
+
+-- Enable RLS for Office Locations
+alter table public.office_locations enable row level security;
+
+create policy "Office locations are viewable by everyone."
+  on office_locations for select
+  using ( true );
+
+create policy "Only admins can insert office locations."
+  on office_locations for insert
+  with check (
+    exists (
+      select 1 from profiles
+      where id = auth.uid() and role = 'admin'
+    )
+  );
+
+create policy "Only admins can update office locations."
+  on office_locations for update
+  using (
+    exists (
+      select 1 from profiles
+      where id = auth.uid() and role = 'admin'
+    )
+  );
+
+create policy "Only admins can delete office locations."
+  on office_locations for delete
+  using (
+    exists (
+      select 1 from profiles
+      where id = auth.uid() and role = 'admin'
+    )
+  );
+
+-- 14. Update Attendance Table with Location columns
+alter table public.attendance
+add column if not exists location_snapshot jsonb, -- Stores { check_in: {lat, lng}, check_out: {lat, lng} }
+add column if not exists duration_minutes integer, -- Total session minutes
+add column if not exists deviation_minutes integer; -- Difference from min working hours
+

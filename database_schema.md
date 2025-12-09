@@ -5,6 +5,7 @@ This document is generated from `migration.sql` and serves as a reference for th
 ## Tables
 
 ### 1. `public.profiles`
+
 - **Description**: Core user profile information.
 - **Primary Key**: `id` (UUID, references `auth.users`)
 - **Columns**:
@@ -22,6 +23,7 @@ This document is generated from `migration.sql` and serves as a reference for th
   - `created_at` (timestamptz, default: now())
 
 ### 2. `public.user_details`
+
 - **Description**: Sensitive user details (PII).
 - **Primary Key**: `id` (UUID, references `public.profiles`)
 - **Columns**:
@@ -41,6 +43,7 @@ This document is generated from `migration.sql` and serves as a reference for th
   - `salary` (numeric)
 
 ### 3. `public.attendance`
+
 - **Description**: Daily attendance records.
 - **Primary Key**: `id` (UUID)
 - **Columns**:
@@ -49,9 +52,13 @@ This document is generated from `migration.sql` and serves as a reference for th
   - `status` (text, check: 'available', 'remote', 'leave', 'absent')
   - `check_in` (timestamptz)
   - `check_out` (timestamptz)
+  - `location_snapshot` (jsonb) - Store `{ check_in: { lat, lng }, check_out: { ... } }`
+  - `duration_minutes` (integer)
+  - `deviation_minutes` (integer)
   - `created_at` (timestamptz, default: now())
 
 ### 4. `public.leaves`
+
 - **Description**: Leave requests and status.
 - **Primary Key**: `id` (UUID)
 - **Columns**:
@@ -65,6 +72,7 @@ This document is generated from `migration.sql` and serves as a reference for th
   - `created_at` (timestamptz, default: now())
 
 ### 5. `public.department_leave_limits`
+
 - **Description**: Leave quotas per department.
 - **Primary Key**: `id` (UUID)
 - **Columns**:
@@ -77,6 +85,7 @@ This document is generated from `migration.sql` and serves as a reference for th
 - **Constraints**: Unique(`department`, `leave_type`)
 
 ### 6. `public.system_settings`
+
 - **Description**: Global system configuration.
 - **Primary Key**: `key` (text)
 - **Columns**:
@@ -84,7 +93,19 @@ This document is generated from `migration.sql` and serves as a reference for th
   - `created_at` (timestamptz, default: now())
   - `updated_at` (timestamptz, default: now())
 
+### 7. `public.office_locations`
+
+- **Description**: Geofenced office locations.
+- **Primary Key**: `id` (UUID)
+- **Columns**:
+  - `name` (text, not null)
+  - `latitude` (float, not null)
+  - `longitude` (float, not null)
+  - `radius` (integer, default: 100)
+  - `created_at` (timestamptz, default: now())
+
 ## Relationships
+
 - `profiles.id` -> `auth.users.id` (1:1)
 - `user_details.id` -> `profiles.id` (1:1)
 - `attendance.user_id` -> `profiles.id` (M:1)
@@ -92,10 +113,13 @@ This document is generated from `migration.sql` and serves as a reference for th
 - `leaves.approver_id` -> `profiles.id` (M:1)
 
 ## Security (RLS)
+
 Row Level Security is enabled on all tables.
+
 - **Profiles**: Public read, Self write.
 - **User Details**: Self read/write.
 - **Attendance**: Public read, Self write.
 - **Leaves**: Public read, Self write.
 - **Department Limits**: Public read, Admin write.
 - **System Settings**: Public read, Admin write.
+- **Office Locations**: Public read, Admin write.

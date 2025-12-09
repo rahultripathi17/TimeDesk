@@ -24,6 +24,7 @@ import {
   BarChart3,
   CalendarPlus,
   Scale,
+  MapPin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -75,7 +76,12 @@ const managerExtra: NavItem[] = [
     children: [
       { label: "Apply Leave", href: "/leaves/apply", icon: CalendarPlus },
       { label: "Leave Balance", href: "/leaves/balance", icon: Scale },
-      { label: "Approvals", href: "/admin/leaves", icon: ClipboardCheck, exact: true },
+      {
+        label: "Approvals",
+        href: "/admin/leaves",
+        icon: ClipboardCheck,
+        exact: true,
+      },
     ],
   },
 ];
@@ -91,7 +97,12 @@ const hrExtra: NavItem[] = [
     children: [
       { label: "Apply Leave", href: "/leaves/apply", icon: CalendarPlus },
       { label: "Leave Balance", href: "/leaves/balance", icon: Scale },
-      { label: "Approvals", href: "/admin/leaves", icon: ClipboardCheck, exact: true },
+      {
+        label: "Approvals",
+        href: "/admin/leaves",
+        icon: ClipboardCheck,
+        exact: true,
+      },
     ],
   },
   { label: "Reports", href: "/hr/reports", icon: BarChart3 },
@@ -100,8 +111,14 @@ const hrExtra: NavItem[] = [
 
 const adminExtra: NavItem[] = [
   { label: "Users & Roles", href: "/admin/users", icon: Users, exact: true },
-  { label: "Add New User", href: "/admin/users/new", icon: UserPlus, exact: true },
+  {
+    label: "Add New User",
+    href: "/admin/users/new",
+    icon: UserPlus,
+    exact: true,
+  },
   { label: "Departments", href: "/admin/departments", icon: Users },
+  { label: "Office Locations", href: "/admin/locations", icon: MapPin },
   { label: "Master Attendance", href: "/admin/attendance", icon: CalendarDays },
   {
     label: "Leaves",
@@ -109,7 +126,12 @@ const adminExtra: NavItem[] = [
     icon: CalendarPlus,
     children: [
       { label: "Limits", href: "/admin/leaves/limits", icon: ShieldCheck },
-      { label: "Approvals", href: "/admin/leaves", icon: ClipboardCheck, exact: true },
+      {
+        label: "Approvals",
+        href: "/admin/leaves",
+        icon: ClipboardCheck,
+        exact: true,
+      },
       { label: "Reset Balances", href: "/admin/leaves/reset", icon: RotateCcw },
     ],
   },
@@ -147,14 +169,16 @@ export function DesktopSidebar({ role }: { role: Role }) {
 
   useEffect(() => {
     const fetchPendingCount = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
       const { count, error } = await supabase
-        .from('leaves')
-        .select('*', { count: 'exact', head: true })
-        .eq('approver_id', user.id)
-        .eq('status', 'pending');
+        .from("leaves")
+        .select("*", { count: "exact", head: true })
+        .eq("approver_id", user.id)
+        .eq("status", "pending");
 
       if (!error && count !== null) {
         setPendingCount(count);
@@ -165,13 +189,13 @@ export function DesktopSidebar({ role }: { role: Role }) {
 
     // Subscribe to changes
     const channel = supabase
-      .channel('leaves_count_changes')
+      .channel("leaves_count_changes")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'leaves',
+          event: "*",
+          schema: "public",
+          table: "leaves",
         },
         () => {
           fetchPendingCount();
@@ -185,30 +209,32 @@ export function DesktopSidebar({ role }: { role: Role }) {
   }, []);
 
   useEffect(() => {
-    const newItems = navForRole(role).map(item => {
+    const newItems = navForRole(role).map((item) => {
       // Check if this item is "Leaves" (parent)
       if (item.label === "Leaves" && item.children) {
-        const newChildren = item.children.map(child => {
+        const newChildren = item.children.map((child) => {
           if (child.label === "Approvals") {
-            return { ...child, badge: pendingCount > 0 ? pendingCount : undefined };
+            return {
+              ...child,
+              badge: pendingCount > 0 ? pendingCount : undefined,
+            };
           }
           return child;
         });
 
-        // Also badge the parent if children have badges? 
+        // Also badge the parent if children have badges?
         // User requested "in slider on icon", which implies parent if collapsed.
         // Let's add badge to parent if count > 0
         return {
           ...item,
           children: newChildren,
-          badge: pendingCount > 0 ? pendingCount : undefined
+          badge: pendingCount > 0 ? pendingCount : undefined,
         };
       }
       return item;
     });
     setItems(newItems);
   }, [role, pendingCount]);
-
 
   const toggleExpand = (label: string) => {
     setExpandedItems((prev) =>
@@ -435,7 +461,12 @@ export function DesktopSidebar({ role }: { role: Role }) {
           </button>
 
           {/* Developer Credit */}
-          <div className={cn("pt-2 border-t border-slate-100 mt-2", !isExpanded && "hidden")}>
+          <div
+            className={cn(
+              "pt-2 border-t border-slate-100 mt-2",
+              !isExpanded && "hidden"
+            )}
+          >
             <a
               href="https://rahul-tripathi.web.app"
               target="_blank"
@@ -463,14 +494,16 @@ export function MobileSidebar({ role }: { role: Role }) {
 
   useEffect(() => {
     const fetchPendingCount = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
       const { count, error } = await supabase
-        .from('leaves')
-        .select('*', { count: 'exact', head: true })
-        .eq('approver_id', user.id)
-        .eq('status', 'pending');
+        .from("leaves")
+        .select("*", { count: "exact", head: true })
+        .eq("approver_id", user.id)
+        .eq("status", "pending");
 
       if (!error && count !== null) {
         setPendingCount(count);
@@ -480,13 +513,13 @@ export function MobileSidebar({ role }: { role: Role }) {
     fetchPendingCount();
 
     const channel = supabase
-      .channel('leaves_count_changes_mobile')
+      .channel("leaves_count_changes_mobile")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'leaves',
+          event: "*",
+          schema: "public",
+          table: "leaves",
         },
         () => {
           fetchPendingCount();
@@ -500,18 +533,21 @@ export function MobileSidebar({ role }: { role: Role }) {
   }, []);
 
   useEffect(() => {
-    const newItems = navForRole(role).map(item => {
+    const newItems = navForRole(role).map((item) => {
       if (item.label === "Leaves" && item.children) {
-        const newChildren = item.children.map(child => {
+        const newChildren = item.children.map((child) => {
           if (child.label === "Approvals") {
-            return { ...child, badge: pendingCount > 0 ? pendingCount : undefined };
+            return {
+              ...child,
+              badge: pendingCount > 0 ? pendingCount : undefined,
+            };
           }
           return child;
         });
         return {
           ...item,
           children: newChildren,
-          badge: pendingCount > 0 ? pendingCount : undefined
+          badge: pendingCount > 0 ? pendingCount : undefined,
         };
       }
       return item;
@@ -638,7 +674,10 @@ export function MobileSidebar({ role }: { role: Role }) {
             <span className="capitalize">
               {role === "hr" ? "HR" : role} panel
             </span>
-            <Link href="/settings" className="flex items-center gap-1 rounded-md px-2 py-1 hover:bg-slate-100">
+            <Link
+              href="/settings"
+              className="flex items-center gap-1 rounded-md px-2 py-1 hover:bg-slate-100"
+            >
               <Settings className="h-4 w-4" />
               <span>Settings</span>
             </Link>

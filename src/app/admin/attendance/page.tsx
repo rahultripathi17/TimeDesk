@@ -741,7 +741,7 @@ export default function MasterAttendancePage() {
                                                         <TableCell>
                                                             <div className="flex items-center gap-3">
                                                                 <Avatar className="h-8 w-8">
-                                                                    <AvatarImage src={(record.profiles.avatar_url && record.profiles.avatar_url !== "NULL" && record.profiles.avatar_url !== "null") ? record.profiles.avatar_url : undefined} />
+                                                                    <AvatarImage src={(record.profiles.avatar_url && record.profiles.avatar_url !== "NULL" && record.profiles.avatar_url !== "null" && (record.profiles.avatar_url.startsWith("http") || record.profiles.avatar_url.startsWith("/"))) ? record.profiles.avatar_url : undefined} />
                                                                     <AvatarFallback className="bg-blue-100 text-blue-700 text-xs">
                                                                         {getInitials(record.profiles.full_name)}
                                                                     </AvatarFallback>
