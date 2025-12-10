@@ -61,13 +61,17 @@ export function TeamAttendanceList({ role, departmentFilter: initialDepartmentFi
             if (!user) return;
 
             // 1. Get Current User Profile
-            if (!currentUser) {
+            let userProfile = currentUser;
+            if (!userProfile) {
                  const { data: profile } = await supabase
                     .from('profiles')
                     .select('*')
                     .eq('id', user.id)
                     .single();
-                 if (profile) setCurrentUser(profile);
+                 if (profile) {
+                     userProfile = profile;
+                     setCurrentUser(profile);
+                 }
             }
 
             // 2. Build Query
@@ -90,9 +94,9 @@ export function TeamAttendanceList({ role, departmentFilter: initialDepartmentFi
 
             // Application Filters
              if (role === 'employee') {
-                 if (currentUser?.department) query = query.eq('department', currentUser.department);
+                 if (userProfile?.department) query = query.eq('department', userProfile.department);
             } else if (role === 'manager') {
-                 if (currentUser?.department) query = query.eq('department', currentUser.department);
+                 if (userProfile?.department) query = query.eq('department', userProfile.department);
             } else if (role === 'hr' || role === 'admin') {
                 if (departmentFilter) query = query.eq('department', departmentFilter);
             }
@@ -184,8 +188,8 @@ export function TeamAttendanceList({ role, departmentFilter: initialDepartmentFi
             });
 
             setUsers(processedUsers);
-        } catch (error) {
-            console.error(error);
+        } catch (error: any) {
+            console.error("Error fetching team data:", error.message || error);
         } finally {
             setLoading(false);
         }

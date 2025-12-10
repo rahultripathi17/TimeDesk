@@ -264,3 +264,67 @@ add column if not exists location_snapshot jsonb, -- Stores { check_in: {lat, ln
 add column if not exists duration_minutes integer, -- Total session minutes
 add column if not exists deviation_minutes integer; -- Difference from min working hours
 
+
+-- 15. Session Management Functions
+-- Get Sessions (Fixes ambiguous column name issue)
+create or replace function get_user_sessions(p_user_id uuid)
+returns setof auth.sessions
+language sql
+security definer
+set search_path = ''
+as $$
+  select * from auth.sessions where user_id = p_user_id order by created_at desc;
+$$;
+
+-- Delete specific session
+create or replace function delete_session(p_session_id uuid)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  delete from auth.sessions where id = p_session_id;
+$$;
+
+-- Delete all sessions for user
+create or replace function delete_all_user_sessions(p_user_id uuid)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  delete from auth.sessions where user_id = p_user_id;
+$$;
+
+-- 16. Max 4 Sessions Trigger
+create or replace function maintain_session_limit()
+returns trigger
+language plpgsql
+security definer
+as $$
+declare
+  v_count integer;
+begin
+  -- Check session count for the user
+  select count(*) into v_count from auth.sessions where user_id = NEW.user_id;
+  
+  -- If more than 4, delete the oldest ones
+  if v_count > 4 then
+    delete from auth.sessions
+    where id in (
+      select id from auth.sessions
+      where user_id = NEW.user_id
+      order by created_at asc
+      limit (v_count - 4)
+    );
+  end if;
+  return NEW;
+end;
+$$;
+
+-- Create the trigger (dropped first to ensure idempotency)
+drop trigger if exists on_auth_session_created on auth.sessions;
+create trigger on_auth_session_created
+  after insert on auth.sessions
+  for each row execute procedure maintain_session_limit();
+

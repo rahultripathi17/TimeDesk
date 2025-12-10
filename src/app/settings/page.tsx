@@ -19,6 +19,7 @@ import { supabase } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import { ProfilePictureUpload } from "@/components/ui/profile-picture-upload";
 import { validatePhone, validatePincode, validateAadhaar, validatePAN, validateRequired } from "@/utils/validation";
+import { SessionList } from "@/components/settings/SessionList";
 
 const INDIAN_STATES = [
     "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana",
@@ -435,6 +436,9 @@ export default function SettingsPage() {
                                 )}
                             </CardContent>
                         </Card>
+
+                        {/* Session Management */}
+                        <SessionList />
                     </div>
                 ) : (
                     <div className="space-y-6">
