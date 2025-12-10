@@ -18,21 +18,45 @@ export async function updateSession(request: NextRequest) {
                 },
                 setAll(cookiesToSet) {
                     cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+                    
                     response = NextResponse.next({
                         request: {
                             headers: request.headers,
                         },
                     })
-                    cookiesToSet.forEach(({ name, value, options }) =>
-                        response.cookies.set(name, value, options)
-                    )
+                    
+                    cookiesToSet.forEach(({ name, value, options }) => {
+                        response.cookies.set(name, value, {
+                            ...options,
+                            maxAge: 60 * 60 * 24 * 7, // Force 7 days persistence
+                        })
+                    })
                 },
             },
         }
     )
 
     // refreshing the auth token
-    await supabase.auth.getUser()
+    // refreshing the auth token
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // Redirect authenticated users away from login page
+    if (user && request.nextUrl.pathname === '/') {
+        return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+
+    // EMERGENCY FIX: Manually extend cookie life if Supabase didn't refresh it
+    // This catches the case where the user just logged in (fresh token) so getUser() didn't fire setAll,
+    // leaving the cookie as "Session" (transient).
+    const allCookies = request.cookies.getAll();
+    allCookies.forEach(cookie => {
+        if (cookie.name.startsWith('sb-') && cookie.name.endsWith('-auth-token')) {
+            response.cookies.set({
+                ...cookie, // spread first
+                maxAge: 60 * 60 * 24 * 7, // Force 7 days
+            });
+        }
+    });
 
     return response
 }
