@@ -20,3 +20,4 @@
 [2025-12-06 09:29:57 +0530] Handle edge case for overnight shifts passing midnight
 [2025-12-07 11:27:29 +0530] Implement LeaveType dropdown (Sick, Casual, Annual)
 [2025-12-07 21:09:03 +0530] Add swipe-to-refresh on timesheet history
+[2025-12-10 15:09:18 +0530] Create AuthRepository for validating user credentials
