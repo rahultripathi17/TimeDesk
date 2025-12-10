@@ -304,7 +304,9 @@ export default function DashboardPage() {
         // Get Min Hours (Default 9 hours = 540 mins)
         // Check work_config
         let minMinutes = 540;
-        if (workConfig?.fixed?.start_time && workConfig?.fixed?.end_time) {
+        if (workConfig?.mode === 'flexible' && workConfig?.flexible?.daily_hours) {
+             minMinutes = workConfig.flexible.daily_hours * 60;
+        } else if (workConfig?.fixed?.start_time && workConfig?.fixed?.end_time) {
             // Simplified calc
              const [startH, startM] = workConfig.fixed.start_time.split(':').map(Number);
              const [endH, endM] = workConfig.fixed.end_time.split(':').map(Number);
@@ -435,6 +437,19 @@ export default function DashboardPage() {
     }
   };
 
+  // --- Helper to calculate min minutes based on config ---
+  const calcMinMinutes = () => {
+    if (workConfig?.mode === 'flexible' && workConfig?.flexible?.daily_hours) {
+        return workConfig.flexible.daily_hours * 60;
+    }
+    if (workConfig?.fixed?.start_time && workConfig?.fixed?.end_time) {
+         const [startH, startM] = workConfig.fixed.start_time.split(':').map(Number);
+         const [endH, endM] = workConfig.fixed.end_time.split(':').map(Number);
+         return ((endH * 60) + endM) - ((startH * 60) + startM);
+    }
+    return 540; // Default 9 hours
+  };
+
   const currentStatus = getStatusDisplay();
   const StatusIcon = currentStatus.icon;
 
@@ -448,6 +463,47 @@ export default function DashboardPage() {
   };
 
   const getWorkSchedule = () => {
+    // Helper to format days [1,2,3] -> "Mon, Tue, Wed"
+    const formatWorkingDays = (days: number[]) => {
+        if (!days || days.length === 0) return "Mon - Fri";
+        const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const sorted = [...days].sort();
+        
+        // Check for continuous range (e.g. 1,2,3,4,5)
+        let isRange = true;
+        for(let i=0; i<sorted.length-1; i++) {
+            if (sorted[i+1] !== sorted[i] + 1) {
+                isRange = false;
+                break;
+            }
+        }
+
+        if (isRange && sorted.length > 2) {
+            return `${dayNames[sorted[0]]} - ${dayNames[sorted[sorted.length-1]]}`;
+        }
+        
+        return sorted.map(d => dayNames[d]).join(', ');
+    };
+
+    const getOffDays = (workingDays: number[]) => {
+        if (!workingDays) return "Sat, Sun";
+        const allDays = [0, 1, 2, 3, 4, 5, 6];
+        const off = allDays.filter(d => !workingDays.includes(d));
+        return formatWorkingDays(off);
+    };
+
+    if (workConfig?.mode === 'flexible') {
+        const hours = workConfig.flexible?.daily_hours || 5;
+        // Default to Mon-Fri if work_days not present
+        const daysArr = workConfig.flexible?.work_days || [1, 2, 3, 4, 5];
+        return {
+            time: `Flexible (${hours} hrs/day)`,
+            type: "Flexible",
+            days: formatWorkingDays(daysArr),
+            off: getOffDays(daysArr)
+        };
+    }
+
     if (!workConfig?.fixed) return {
       time: "09:00 AM - 05:00 PM",
       type: "Standard",
@@ -462,14 +518,12 @@ export default function DashboardPage() {
       return format(date, 'hh:mm a');
     };
 
-    // Determine working days (simplified logic, assuming standard if not present)
-    const workingDays = workConfig.working_days ? workConfig.working_days.join(', ') : "Mon - Fri";
-    const offDays = workConfig.off_days ? workConfig.off_days.join(', ') : "Sat, Sun";
+    const daysArr = workConfig.fixed.work_days || [1, 2, 3, 4, 5];
 
     return {
       time: `${formatTime(workConfig.fixed.start_time)} - ${formatTime(workConfig.fixed.end_time)}`,
-      days: workingDays,
-      off: offDays
+      days: formatWorkingDays(daysArr),
+      off: getOffDays(daysArr)
     };
   };
 
@@ -574,8 +628,9 @@ export default function DashboardPage() {
                                 const diffMs = now.getTime() - checkInDate.getTime();
                                 const diffHours = diffMs / (1000 * 60 * 60);
 
-                                // Dynamic duration from config (default 3 hours)
-                                const minDuration = workConfig?.min_duration || 3;
+                                // Dynamic duration from config (default 9 hours for fixed, or flexible daily hours)
+                                // We use calcMinMinutes() / 60 for hours
+                                const minDuration = calcMinMinutes() / 60;
 
                                 if (diffHours < minDuration) {
                                   // Calculate remaining time
@@ -615,13 +670,7 @@ export default function DashboardPage() {
                                  const h = Math.floor(durationMinutes / 60);
                                  const m = durationMinutes % 60;
                                  
-                                 // Calculate min minutes again for display logic consistency
-                                 let minMinutes = 540;
-                                 if (workConfig?.fixed?.start_time && workConfig?.fixed?.end_time) {
-                                      const [startH, startM] = workConfig.fixed.start_time.split(':').map(Number);
-                                      const [endH, endM] = workConfig.fixed.end_time.split(':').map(Number);
-                                      minMinutes = ((endH * 60) + endM) - ((startH * 60) + startM);
-                                 }
+                                 const minMinutes = calcMinMinutes();
                                  
                                  const deviation = durationMinutes - minMinutes;
                                  let statusMsg = "";

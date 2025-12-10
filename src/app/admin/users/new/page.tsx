@@ -195,6 +195,10 @@ function AddUserForm() {
                 }
                 if (data.work_config.flexible) {
                     setFlexibleDailyHours(data.work_config.flexible.daily_hours?.toString() || "5");
+                    // Load work days for flexible too (using same state variable)
+                    if (data.work_config.flexible.work_days) {
+                         setFixedWorkDays(data.work_config.flexible.work_days);
+                    }
                 }
             }
 
@@ -295,7 +299,8 @@ function AddUserForm() {
                         work_days: fixedWorkDays
                     } : undefined,
                     flexible: workMode === 'flexible' ? {
-                        daily_hours: parseInt(flexibleDailyHours) || 5
+                        daily_hours: parseInt(flexibleDailyHours) || 5,
+                        work_days: fixedWorkDays
                     } : undefined
                 }
             };
@@ -926,6 +931,27 @@ function AddUserForm() {
                                                     <span className="text-sm text-slate-500">Hours</span>
                                                 </div>
                                                 <p className="text-[10px] text-slate-500">Employee can work these hours at any time during the day.</p>
+                                            </div>
+
+                                            <div className="space-y-2 max-w-lg mt-4">
+                                                <Label className="text-xs font-medium block mb-2">Working Days</Label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, index) => (
+                                                        <div
+                                                            key={day}
+                                                            onClick={() => toggleWorkDay(index)}
+                                                            className={cn(
+                                                                "px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer border transition-colors",
+                                                                fixedWorkDays.includes(index)
+                                                                    ? "bg-slate-900 text-white border-slate-900"
+                                                                    : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+                                                            )}
+                                                        >
+                                                            {day}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <p className="text-[10px] text-slate-500 mt-1">Select the days the employee is expected to work.</p>
                                             </div>
                                         </div>
                                     )}

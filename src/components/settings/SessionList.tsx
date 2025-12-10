@@ -88,7 +88,7 @@ export function SessionList() {
                     Active Sessions
                 </CardTitle>
                 <CardDescription>
-                    Manage where you're logged in.
+                    Manage where you're logged in. Only the 4 most recent sessions are kept active.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
