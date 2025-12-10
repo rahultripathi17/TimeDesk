@@ -137,6 +137,7 @@ const adminExtra: NavItem[] = [
     ],
   },
   { label: "Reports", href: "/admin/reports", icon: BarChart3 },
+  { label: "Policies", href: "/admin/policies", icon: ShieldCheck },
   { label: "Notice Board", href: "/admin/settings", icon: Megaphone },
 ];
 export function navForRole(role: Role): NavItem[] {
@@ -178,15 +179,50 @@ export function DesktopSidebar({ role }: { role: Role }) {
       const { count, error } = await supabase
         .from("leaves")
         .select("*", { count: "exact", head: true })
-        .eq("approver_id", user.id)
         .eq("status", "pending");
 
       if (!error && count !== null) {
         setPendingCount(count);
       }
     };
+    
+    // UPDATED: Fetch Policy Status
+    const checkPolicyStatus = async () => {
+        if (role === 'admin') return; // Admin already has it in static list
 
-    fetchPendingCount();
+        const { data: { user } } = await supabase.auth.getUser();
+        if(!user) return;
+        
+        // 1. Get User Dept
+        const { data: profile } = await supabase.from('profiles').select('department').eq('id', user.id).single();
+        if(!profile?.department) return;
+
+        // 2. Check Policy
+        const { data: policy } = await supabase.from('department_policies')
+            .select('is_enabled')
+            .eq('department', profile.department)
+            .maybeSingle();
+
+        if (policy?.is_enabled) {
+            setItems(prev => {
+                // Prevent duplicate
+                if (prev.find(i => i.label === "Company Policy")) return prev;
+                return [...prev, { label: "Company Policy", href: "/policy", icon: ShieldCheck }];
+            });
+        }
+    };
+
+    if (role === 'admin' || role === 'manager' || role === 'hr') {
+        fetchPendingCount();
+    }
+    
+    checkPolicyStatus();
+
+    // Simplify interval for now
+    const interval = setInterval(() => {
+        if (role === 'admin' || role === 'manager' || role === 'hr') fetchPendingCount();
+    }, 60000);
+    
 
     // Subscribe to changes
     const channel = supabase
@@ -205,9 +241,18 @@ export function DesktopSidebar({ role }: { role: Role }) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+        clearInterval(interval);
+        supabase.removeChannel(channel);
     };
-  }, []);
+  }, [role]);
+
+  // Update items when role changes (basic reset)
+  useEffect(() => {
+      setItems(navForRole(role));
+  }, [role]);
+
+
+
 
   useEffect(() => {
     const newItems = navForRole(role).map((item) => {
@@ -513,6 +558,30 @@ export function MobileSidebar({ role }: { role: Role }) {
 
     fetchPendingCount();
 
+    // UPDATED: Fetch Policy Status
+    const checkPolicyStatus = async () => {
+        if (role === 'admin') return;
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if(!user) return;
+        
+        const { data: profile } = await supabase.from('profiles').select('department').eq('id', user.id).single();
+        if(!profile?.department) return;
+
+        const { data: policy } = await supabase.from('department_policies')
+            .select('is_enabled')
+            .eq('department', profile.department)
+            .maybeSingle();
+
+        if (policy?.is_enabled) {
+            setItems(prev => {
+                if (prev.find(i => i.label === "Company Policy")) return prev;
+                return [...prev, { label: "Company Policy", href: "/policy", icon: ShieldCheck }];
+            });
+        }
+    };
+    checkPolicyStatus();
+
     const channel = supabase
       .channel("leaves_count_changes_mobile")
       .on(
@@ -531,7 +600,7 @@ export function MobileSidebar({ role }: { role: Role }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [role]);
 
   useEffect(() => {
     const newItems = navForRole(role).map((item) => {

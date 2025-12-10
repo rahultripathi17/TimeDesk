@@ -18,7 +18,9 @@ export const metadata: Metadata = {
   description: "TimeDesk is a comprehensive, role-based attendance and leave management system designed for modern organizations. Seamlessly manage attendance, leaves, and reporting for Employees, Managers, HR, and Admins.",
   manifest: "/manifest.json",
   icons: {
-    icon: "/timedesk-logo.png",
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/favicon.ico",
   },
   appleWebApp: {
     capable: true,

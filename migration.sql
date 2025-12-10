@@ -328,3 +328,39 @@ create trigger on_auth_session_created
   after insert on auth.sessions
   for each row execute procedure maintain_session_limit();
 
+
+-- Department Policies Management
+create table if not exists public.department_policies (
+    id uuid default gen_random_uuid() primary key,
+    department text not null unique,
+    is_enabled boolean default false,
+    policy_url text, -- Google Drive view-only link
+    created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+    updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Enable RLS
+alter table public.department_policies enable row level security;
+
+-- Policies for department_policies
+create policy "Admins can manage policies"
+    on public.department_policies
+    for all
+    using (
+        exists (
+            select 1 from public.profiles
+            where profiles.id = auth.uid()
+            and profiles.role = 'admin'
+        )
+    );
+
+create policy "Users can view enabled policies for their department"
+    on public.department_policies
+    for select
+    using (
+        is_enabled = true
+        and department = (
+            select department from public.profiles
+            where profiles.id = auth.uid()
+        )
+    );
