@@ -57,6 +57,8 @@ export default function HRTeamsPage() {
                     <TeamAttendanceList 
                         role="hr" 
                         departmentFilter={selectedDept} 
+                        requireFilterSelection={true}
+                        onViewAll={() => setSelectedDept('all')}
                         headerAction={
                             <div className="w-full sm:w-[200px]">
                                 {loading ? (
@@ -65,19 +67,19 @@ export default function HRTeamsPage() {
                                     </div>
                                 ) : (
                                     <Select
-                                        value={selectedDept || "all"}
+                                        value={selectedDept || ""}
                                         onValueChange={(val) => setSelectedDept(val === "all" ? null : val)}
                                     >
                                         <SelectTrigger className="h-9">
                                             <SelectValue placeholder="Select Department" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="all">All Departments</SelectItem>
                                             {departments.map((dept) => (
                                                 <SelectItem key={dept} value={dept}>
                                                     {dept}
                                                 </SelectItem>
                                             ))}
+                                            <SelectItem value="all">All Departments</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 )}
