@@ -270,10 +270,14 @@ export default function DashboardPage() {
         }
 
         if (!isValid && officeLocations.length > 0) {
+          const distanceDisplay = minDistance > 1000 
+            ? `${(minDistance / 1000).toFixed(1)}km` 
+            : `${Math.round(minDistance)}m`;
+
           alert(
-            `You are outside the office zone. (${Math.round(
-              minDistance
-            )}m away). Please go to the office to check in.`
+            `You are outside the office zone (~${distanceDisplay} away).\n\n` +
+            `Laptop GPS depends on Wi-Fi and can be inaccurate.\n` +
+            `Please use the mobile web app for precise location access to mark your attendance.`
           );
           setActionLoading(false);
           return;

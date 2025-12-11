@@ -47,6 +47,31 @@ export async function POST(request: NextRequest) {
             requestedDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
         }
 
+        // 3. Check for Overlapping Leaves (Prevent Duplicate Requests)
+        const { data: overlappingLeaves, error: overlapError } = await supabaseAdmin
+            .from('leaves')
+            .select('id, start_date, end_date, status')
+            .eq('user_id', userId)
+            .neq('status', 'rejected') // Check both pending and approved
+            .lte('start_date', endDate) // Overlap logic: Start <= NewEnd
+            .gte('end_date', startDate); // Overlap logic: End >= NewStart
+
+        if (overlapError) throw overlapError;
+
+        if (overlappingLeaves && overlappingLeaves.length > 0) {
+            const hasApproved = overlappingLeaves.some(l => l.status === 'approved');
+            
+            if (hasApproved) {
+                return NextResponse.json({
+                    error: "That day leave is already approved. You can't apply. Contact admin."
+                }, { status: 400 });
+            } else {
+                return NextResponse.json({
+                    error: "You already have a leave request for this date. Please cancel it to proceed."
+                }, { status: 400 });
+            }
+        }
+
         if (department) {
             // 2. Get Leave Limit for Department & Type
             const { data: limitData, error: limitError } = await supabaseAdmin
