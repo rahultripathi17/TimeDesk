@@ -179,6 +179,7 @@ export function DesktopSidebar({ role }: { role: Role }) {
       const { count, error } = await supabase
         .from("leaves")
         .select("*", { count: "exact", head: true })
+        .eq("approver_id", user.id) // Align with MobileSidebar and Page logic
         .eq("status", "pending");
 
       if (!error && count !== null) {
