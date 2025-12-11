@@ -59,10 +59,15 @@ export async function POST(request: NextRequest) {
             if (limitData) {
                 const maxDays = limitData.limit_days;
 
-                // 4. Calculate used/pending days in current year
-                const currentYear = new Date().getFullYear();
-                const startOfYear = `${currentYear}-01-01`;
-                const endOfYear = `${currentYear}-12-31`;
+                // 4. Calculate used/pending days in current year/cycle
+                const { data: resetData } = await supabaseAdmin
+                    .from('system_settings')
+                    .select('value')
+                    .eq('key', 'leave_reset_date')
+                    .single();
+
+                const startDate = resetData?.value || `${new Date().getFullYear()}-01-01`;
+                const endDate = `${new Date().getFullYear()}-12-31`;
 
                 const { data: existingLeaves, error: leavesError } = await supabaseAdmin
                     .from('leaves')
@@ -70,8 +75,8 @@ export async function POST(request: NextRequest) {
                     .eq('user_id', userId)
                     .eq('type', type)
                     .neq('status', 'rejected') // Count pending and approved
-                    .gte('start_date', startOfYear)
-                    .lte('end_date', endOfYear);
+                    .gt('start_date', startDate) // Strictly after reset date to match balance logic
+                    .lte('end_date', endDate);
 
                 if (leavesError) throw leavesError;
 
