@@ -136,7 +136,7 @@ export function AttendanceCalendar({ userId }: { userId?: string }) {
             // 0. Fetch Work Config and Joining Date
             const { data: profileData } = await supabase
                 .from('profiles')
-                .select('work_config, date_of_joining')
+                .select('work_config, created_at')
                 .eq('id', targetUserId)
                 .single();
 
@@ -144,8 +144,9 @@ export function AttendanceCalendar({ userId }: { userId?: string }) {
                 if (profileData.work_config) {
                     setWorkConfig(profileData.work_config as WorkConfig);
                 }
-                if (profileData.date_of_joining) {
-                    setDateOfJoining(parseISO(profileData.date_of_joining));
+                // Use created_at as the "Joining Date" for attendance logic
+                if (profileData.created_at) {
+                    setDateOfJoining(parseISO(profileData.created_at));
                 }
             }
 
@@ -419,7 +420,7 @@ export function AttendanceCalendar({ userId }: { userId?: string }) {
 
                     {!effectiveStyle && inMonth && (
                         <div className="mt-1.5 text-[10px] text-slate-400">
-                            {isBeforeJoining ? "Not Joined" : "-"}
+                            {isBeforeJoining ? "Not Registered" : "-"}
                         </div>
                     )}
                 </div>
