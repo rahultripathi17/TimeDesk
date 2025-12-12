@@ -26,6 +26,7 @@ import {
   Scale,
   MapPin,
   Building2,
+  Network,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -139,6 +140,7 @@ const adminExtra: NavItem[] = [
   { label: "Reports", href: "/admin/reports", icon: BarChart3 },
   { label: "Policies", href: "/admin/policies", icon: ShieldCheck },
   { label: "Notice Board", href: "/admin/settings", icon: Megaphone },
+  { label: "Hierarchy", href: "/admin/hierarchy", icon: Network },
 ];
 export function navForRole(role: Role): NavItem[] {
   switch (role) {
