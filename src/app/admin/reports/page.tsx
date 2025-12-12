@@ -1,5 +1,10 @@
 "use client";
 
+import ExcelJS from 'exceljs';
+import { supabase } from "@/utils/supabase/client";
+import { Download, FileSpreadsheet, FileUser } from 'lucide-react';
+import { toast } from "sonner";
+
 import { AppShell } from "@/components/layout/AppShell";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -125,6 +130,375 @@ export default function AdminReportsPage() {
     fetchReport(newPage);
   };
 
+  // Download State
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const generateDepartmentMatrix = async () => {
+    if (!selectedDept || selectedDept === 'all') {
+        toast.error("Please select a specific department for the Matrix Report");
+        return;
+    }
+
+    setIsDownloading(true);
+    try {
+        const year = parseInt(selectedYear);
+        const month = parseInt(selectedMonth);
+        
+        // Date Range: 1st to End of Month
+        const startDate = format(new Date(year, month - 1, 1), 'yyyy-MM-dd');
+        const lastDay = new Date(year, month, 0); 
+        const endDate = format(lastDay, 'yyyy-MM-dd');
+        const daysInMonth = lastDay.getDate();
+
+        // 1. Fetch Users in Dept
+        const { data: users, error: userError } = await supabase
+            .from('profiles')
+            .select('id, full_name, role, designation, department, work_config')
+            .eq('department', selectedDept)
+            .order('role'); // Role sort (admin<hr<manager<employee approx) - refine later if needed
+
+        if (userError || !users) throw new Error("Failed to fetch users");
+
+        // Custom Sort: Manager -> Employee
+        const sortedUsers = users.sort((a: any, b: any) => {
+             const roleScore = (r: string) => {
+                 const role = r?.toLowerCase();
+                 if (role === 'manager') return 1;
+                 if (role === 'hr') return 2;
+                 if (role === 'admin') return 0;
+                 return 3; // employee
+             };
+             return roleScore(a.role) - roleScore(b.role);
+        });
+
+        const userIds = sortedUsers.map((u: any) => u.id);
+
+        // 2. Fetch Attendance
+        const { data: attendance } = await supabase
+            .from('attendance')
+            .select('user_id, date, status, check_in, check_out')
+            .in('user_id', userIds)
+            .gte('date', startDate)
+            .lte('date', endDate);
+
+        // 3. Fetch Leaves (Approved)
+        const { data: leaves } = await supabase
+            .from('leaves')
+            .select('*')
+            .in('user_id', userIds)
+            .eq('status', 'approved')
+            .or(`start_date.lte.${endDate},end_date.gte.${startDate}`);
+
+        // 4. Fetch Department Leave Types for Colors and Paid Status
+        const { data: leaveTypes } = await supabase
+            .from('department_leave_limits')
+            .select('leave_type, color, is_paid')
+            .eq('department', selectedDept);
+
+        // 5. Build Excel
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet('Muster Roll');
+
+        // Styles
+        const headerStyle = { font: { bold: true, color: { argb: 'FFFFFFFF' } }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } } } as any;
+        const centerStyle = { alignment: { horizontal: 'center', vertical: 'middle' } } as any;
+        const borderStyle = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } } as any;
+
+        // Colors
+        // Base Colors
+        const colorMap: Record<string, any> = {
+            'P': { argb: 'FFDCFCE7' }, // Green-100
+            'A': { argb: 'FFFEE2E2' }, // Red-100
+            'R': { argb: 'FFCFFAFE' }, // Cyan-100
+            'RG': { argb: 'FFFFEDD5' }, // Orange-100
+            'WO': { argb: 'FFF1F5F9' }, // Slate-100
+            'L': { argb: 'FFFEF9C3' }, // Default Yellow
+            'HD': { argb: 'FFFFF7ED' }, // Orange-50 (Half Day)
+        };
+
+        // Enrich Color Map with Dynamic Types
+        // Store Paid status logic
+        const unpaidTypes = new Set<string>();
+
+        if (leaveTypes) {
+            leaveTypes.forEach((lt: any) => {
+                // Generate a short code: First 2 letters UpperCase
+                const code = lt.leave_type.substring(0, 2).toUpperCase();
+                // Remove '#' from color if exists
+                const hex = lt.color.replace('#', '');
+                const argb = 'FF' + hex;
+                colorMap[code] = { argb: argb };
+                
+                if (lt.is_paid === false) {
+                    unpaidTypes.add(code);
+                }
+            });
+        }
+
+        // Title Rows
+        sheet.mergeCells('A1:C1');
+        sheet.getCell('A1').value = 'Attendance Muster Roll';
+        sheet.getCell('A1').font = { size: 16, bold: true };
+        
+        sheet.mergeCells('A2:F2');
+        sheet.getCell('A2').value = `${selectedDept} Department - ${format(new Date(year, month-1), 'MMMM yyyy')}  |  Total Employees: ${sortedUsers.length}`;
+
+        // Header Row Construction
+        // Columns: S. No., ID, Name, Designation, Role, 1..31, Pres, Abs, Leave, RG
+        const dateCols: string[] = [];
+        for(let i=1; i<=daysInMonth; i++) dateCols.push(i.toString().padStart(2, '0'));
+
+        const headers = ['S. No.', 'ID', 'Employee Name', 'Designation', 'Role', ...dateCols, 'P', 'R', 'L', 'A', 'RG', 'EW'];
+        const headerRow = sheet.addRow(headers);
+        
+        headerRow.eachCell((cell: any, colNumber: number) => {
+            cell.style = { ...headerStyle, ...centerStyle, border: borderStyle };
+            if (colNumber > 5 && colNumber <= 5 + daysInMonth) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } }; // Darker for dates
+            }
+        });
+
+        // Rows
+        sortedUsers.forEach((user: any, index: number) => {
+            const rowData: any[] = [
+                index + 1,
+                user.id.substring(0, 6).toUpperCase(),
+                user.full_name,
+                user.designation || '-',
+                user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : '-'
+            ];
+
+            let pCount = 0, rCount = 0, lCount = 0, aCount = 0, rgCount = 0, ewCount = 0;
+
+            // Days
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dateStr = format(new Date(year, month - 1, i), 'yyyy-MM-dd');
+                const dateObj = new Date(dateStr);
+                const dayOfWeek = dateObj.getDay(); // 0=Sun, 6=Sat
+
+                // Find Record
+                const record = attendance?.find((a: any) => a.user_id === user.id && a.date === dateStr);
+                
+                // Find Leave
+                const leave = leaves?.find((l: any) => 
+                    l.user_id === user.id && 
+                    l.start_date <= dateStr && 
+                    l.end_date >= dateStr
+                );
+
+                let code = '';
+                let cellColor = null;
+
+                // Priority Logic
+                if (record?.status === 'present' || record?.status === 'available') {
+                     // Check if Regularized via Leave Type 'Regularization'
+                     const regLeave = leaves?.find((l: any) => 
+                        l.user_id === user.id && 
+                        l.start_date <= dateStr && 
+                        l.end_date >= dateStr &&
+                        l.type === 'Regularization'
+                     );
+
+                     if (regLeave || record.status === 'Regularization') {
+                         code = 'RG';
+                         cellColor = colorMap['RG'];
+                         pCount++; 
+                         rgCount++; // Explicit RG count
+                     } else {
+                         code = 'P';
+                         cellColor = colorMap['P'];
+                         pCount++;
+                     }
+                } else if (record?.status === 'remote') {
+                    code = 'R';
+                    cellColor = colorMap['R'];
+                    rCount++;
+                }
+                // 3. Leaves (Dynamic)
+                else if (leave) {
+                    if (leave.type === 'Extra Working Day') {
+                        code = 'EW';
+                        cellColor = { argb: 'FF9333EA' }; // Purple
+                        ewCount++;
+                    } 
+                    // Get config for this specific leave type
+                    else {
+                        const leaveConfig = leaveTypes?.find((lt: any) => lt.leave_type === leave.type);
+                        const isPaid = leaveConfig ? leaveConfig.is_paid !== false : true; // Default to true if not found
+
+                        if (leave.session && leave.session !== 'full_day') {
+                            // Half Day Logic
+                            // Check if THIS specific leave is paid/unpaid
+                            if (!isPaid) {
+                                lCount += 0.5; // Only count in 'Leave' column if unpaid
+                                code = 'HD(U)';
+                            } else {
+                                code = 'HD';
+                                // Paid Half Day - Do not count in 'Leave' (Unpaid) count
+                                // Still present for other half, handled by pCount += 0.5 below
+                            }
+                            
+                            pCount += 0.5; // Always present for half day
+                            cellColor = colorMap['HD'];
+                        } else {
+                            // Full Day dynamic
+                            const baseCode = leave.type.substring(0, 2).toUpperCase();
+                            
+                            // Check if Unpaid
+                            if (!isPaid) {
+                                code = `${baseCode}(U)`;
+                                lCount += 1; // Count as Leave only if Unpaid
+                            } else {
+                                code = baseCode;
+                            }
+
+                            if (!colorMap[baseCode]) {
+                                // Fallback
+                                if (!isPaid) code = 'L(U)';
+                                else code = 'L';
+                                cellColor = colorMap['L'];
+                            } else {
+                                cellColor = colorMap[baseCode];
+                            }
+                        }
+                    }
+                }
+                // 5. Dynamic Weekly Off (WO) Logic
+                else {
+                    // Check if it's a working day for THIS user
+                    let isWorkingDay = true;
+                    // Default to Mon-Fri (1-5) if no config, OR Sat/Sun off (0, 6)
+                    // If work_config exists, use it.
+                    
+                    if (user.work_config) {
+                        try {
+                            const wc = typeof user.work_config === 'string' ? JSON.parse(user.work_config) : user.work_config;
+                            
+                            if (wc.mode === 'fixed' && wc.fixed?.work_days && Array.isArray(wc.fixed.work_days)) {
+                                isWorkingDay = wc.fixed.work_days.includes(dayOfWeek);
+                            } else if (wc.mode === 'flexible' && wc.flexible?.work_days && Array.isArray(wc.flexible.work_days)) {
+                                 // Some flexible configs might have work days
+                                 isWorkingDay = wc.flexible.work_days.includes(dayOfWeek);
+                            } else {
+                                // Default fallback if config exists but is empty/weird: Standard Weekend
+                                isWorkingDay = dayOfWeek !== 0 && dayOfWeek !== 6; 
+                            }
+                        } catch (e) {
+                             // Fallback on error
+                             isWorkingDay = dayOfWeek !== 0 && dayOfWeek !== 6;
+                        }
+                    } else {
+                        // No config -> Default to Standard Weekend Off (Sat, Sun)
+                        isWorkingDay = dayOfWeek !== 0 && dayOfWeek !== 6;
+                    }
+
+                    if (!isWorkingDay) {
+                         code = 'WO';
+                         cellColor = colorMap['WO'];
+                    } else {
+                        // 6. Absent
+                        if (new Date(dateStr) <= new Date()) {
+                             code = 'A';
+                             cellColor = colorMap['A'];
+                             aCount++;
+                        } else {
+                            code = '-';
+                        }
+                    }
+                }
+
+                rowData.push(code);
+            }
+
+            // Summaries
+            rowData.push(pCount, rCount, lCount, aCount, rgCount, ewCount);
+
+            const excelRow = sheet.addRow(rowData);
+            
+            // Format Cells
+            excelRow.eachCell((cell: any, colNum: number) => {
+                cell.border = borderStyle;
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                
+                if (colNum > 5 && colNum <= 5 + daysInMonth) {
+                     const val = cell.value?.toString();
+                     // Check if it's a dynamic code (remove (U))
+                     if (val) {
+                         const baseVal = val.replace('(U)', '');
+                         if (colorMap[baseVal]) {
+                             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: colorMap[baseVal] };
+                         } else if (val === 'EW') {
+                             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF9333EA' } };
+                         }
+                     }
+                }
+            });
+        });
+
+        // --- LEGEND ---
+        sheet.addRow([]); // Empty row
+        
+        const legendTitleRow = sheet.addRow(['Legend / Abbreviations:']);
+        legendTitleRow.getCell(1).font = { bold: true };
+        
+        const legendItems = [
+            ['P', 'Present'],
+            ['A', 'Absent'],
+            ['R', 'Remote Work'],
+            ['RG', 'Regularized'],
+            ['EW', 'Extra Working Day'],
+            ['WO', 'Weekly Off'],
+            ['HD', 'Half Day Leave (Paid)'],
+            ['HD(U)', 'Half Day Leave (Unpaid)']
+        ];
+        
+        // Add dynamic leave types to legend
+        if (leaveTypes) {
+             leaveTypes.forEach((lt: any) => {
+                 const baseCode = lt.leave_type.substring(0, 2).toUpperCase();
+                 const isUnpaid = lt.is_paid === false;
+                 
+                 const displayCode = isUnpaid ? `${baseCode}(U)` : baseCode;
+                 const typeDescription = `${lt.leave_type} ${isUnpaid ? '(Unpaid)' : '(Paid)'}`;
+                 
+                 legendItems.push([displayCode, typeDescription]);
+             });
+        }
+
+        legendItems.forEach(([code, desc]) => {
+            const r = sheet.addRow([code, desc]);
+            r.getCell(1).font = { bold: true };
+            if (colorMap[code]) {
+                 r.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: colorMap[code] };
+            }
+        });
+
+        // Widths
+        sheet.getColumn(1).width = 10;
+        sheet.getColumn(2).width = 25;
+        sheet.getColumn(3).width = 18; // Designation
+        sheet.getColumn(4).width = 12; // Role
+        for(let i=5; i<=4+daysInMonth; i++) sheet.getColumn(i).width = 5; // Date cols narrow
+
+        // Export
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `${selectedDept}_Attendance_${format(new Date(year, month-1), 'MMM_yyyy')}.xlsx`;
+        anchor.click();
+        window.URL.revokeObjectURL(url);
+        toast.success("Muster Roll downloaded");
+
+    } catch (e: any) {
+        console.error("Matrix Error", e);
+        toast.error(e.message || "Download failed");
+    } finally {
+        setIsDownloading(false);
+    }
+  };
+
   return (
     <AppShell role="admin">
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
@@ -175,7 +549,7 @@ export default function AdminReportsPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="bg-slate-100 p-1 rounded-lg w-full md:w-auto grid grid-cols-3 h-auto gap-2">
+            <TabsList className="bg-slate-100 p-1 rounded-lg w-full md:w-auto grid grid-cols-4 h-auto gap-2">
                 <TabsTrigger 
                     value="overview" 
                     className="data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm text-slate-500 py-2.5"
@@ -194,10 +568,17 @@ export default function AdminReportsPage() {
                 >
                     Top Performers
                 </TabsTrigger>
+                <TabsTrigger 
+                    value="downloads" 
+                    className="data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm text-slate-500 py-2.5"
+                >
+                    Downloads
+                </TabsTrigger>
             </TabsList>
 
             {/* OVERVIEW DASHBOARD */}
             <TabsContent value="overview" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
                 {loading || !overviewData?.kpi ? (
                     <div className="flex justify-center py-20">
                         <Loader2 className="h-10 w-10 animate-spin text-slate-400" />
@@ -595,6 +976,62 @@ export default function AdminReportsPage() {
                         </div>
                     </CardContent>
                 </Card>
+            </TabsContent>
+
+
+            {/* DOWNLOADS TAB */}
+            <TabsContent value="downloads" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {/* Department Matrix Card */}
+                    <Card className="hover:shadow-md transition-shadow">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-lg">
+                                <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
+                                Department Muster Roll
+                            </CardTitle>
+                            <CardDescription>
+                                Monthly attendance matrix for the entire {selectedDept === 'all' ? 'company' : 'department'}.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                             <div className="bg-slate-50 p-4 rounded-md text-xs text-slate-500 mb-4 space-y-2">
+                                <p><strong>Includes:</strong> P, A, CL, PL, RG</p>
+                                <p><strong>Format:</strong> Color-coded Excel Matrix</p>
+                                <p><strong>Sorted By:</strong> Role (Mgr &gt; Emp)</p>
+                             </div>
+                             <Button 
+                                className="w-full bg-emerald-600 hover:bg-emerald-700" 
+                                onClick={generateDepartmentMatrix}
+                                disabled={isDownloading || selectedDept === 'all'}
+                             >
+                                {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                                Download Matrix
+                             </Button>
+                             {selectedDept === 'all' && <p className="text-[10px] text-red-500 mt-2 text-center">Select a department first</p>}
+                        </CardContent>
+                    </Card>
+
+                    {/* Individual Report Card (Placeholder for now) */}
+                    <Card className="hover:shadow-md transition-shadow opacity-60">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-lg">
+                                <FileUser className="h-5 w-5 text-blue-600" />
+                                Individual Report
+                            </CardTitle>
+                            <CardDescription>
+                                Detailed daily breakdown for a specific employee.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                             <div className="bg-slate-50 p-4 rounded-md text-xs text-slate-500 mb-4">
+                                <p>Coming Soon</p>
+                             </div>
+                             <Button variant="outline" className="w-full" disabled>
+                                Select Employee
+                             </Button>
+                        </CardContent>
+                    </Card>
+                </div>
             </TabsContent>
         </Tabs>
       </div>

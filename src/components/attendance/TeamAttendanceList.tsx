@@ -139,6 +139,23 @@ export function TeamAttendanceList({ role, departmentFilter: initialDepartmentFi
                 const activeLeave = u.leaves?.find((l: any) =>
                     l.status === 'approved' &&
                     l.type !== 'Regularization' && // Regularization is not a leave
+                    l.type !== 'Extra Working Day' && // Extra Working Day is not a leave
+                    l.start_date <= today &&
+                    l.end_date >= today
+                );
+
+                // Check Extra Working Day
+                const extraWork = u.leaves?.find((l: any) =>
+                    l.status === 'approved' &&
+                    l.type === 'Extra Working Day' &&
+                    l.start_date <= today &&
+                    l.end_date >= today
+                );
+
+                // Check Regularization
+                const regularization = u.leaves?.find((l: any) =>
+                    l.status === 'approved' &&
+                    l.type === 'Regularization' &&
                     l.start_date <= today &&
                     l.end_date >= today
                 );
@@ -185,6 +202,10 @@ export function TeamAttendanceList({ role, departmentFilter: initialDepartmentFi
                     } else {
                         status = 'leave';
                     }
+                } else if (extraWork) {
+                    status = 'extra_work';
+                } else if (regularization) {
+                    status = 'regularization';
                 } else if (todayAttendance) {
                     status = todayAttendance.status;
                 }
@@ -219,6 +240,8 @@ export function TeamAttendanceList({ role, departmentFilter: initialDepartmentFi
             case "leave_second_half": return "bg-amber-100 text-amber-700";
             case "available_after_leave": return "bg-green-100 text-green-700";
             case "available_before_leave": return "bg-green-100 text-green-700";
+            case "extra_work": return "bg-purple-100 text-purple-700";
+            case "regularization": return "bg-blue-100 text-blue-700";
             case "absent": return "bg-red-100 text-red-700";
             default: return "bg-slate-100 text-slate-700";
         }
@@ -234,6 +257,8 @@ export function TeamAttendanceList({ role, departmentFilter: initialDepartmentFi
             case "leave_second_half": return "On Half Day Leave";
             case "available_after_leave": return "Available";
             case "available_before_leave": return "Available till 1:00 PM";
+            case "extra_work": return "Extra Working Day";
+            case "regularization": return "Regularized";
             case "absent": return "Absent";
             default: return user.status;
         }

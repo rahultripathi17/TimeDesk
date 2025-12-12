@@ -336,7 +336,13 @@ export default function MasterAttendancePage() {
         let statusLabel = "";
 
         if (activeLeave) {
-            if (activeLeave.type === 'Half Day' || activeLeave.session) {
+            if (activeLeave.type === 'Extra Working Day') {
+                status = 'extra_work';
+                statusLabel = 'Extra Working Day';
+            } else if (activeLeave.type === 'Regularization') {
+                status = 'regularization';
+                statusLabel = 'Regularized';
+            } else if (activeLeave.type === 'Half Day' || activeLeave.session) {
                 // Dynamic Calculation if work_config exists
                 let midpointTime = "13:00"; // Default fallback
                 let displayTime = "";
@@ -382,6 +388,7 @@ export default function MasterAttendancePage() {
                         statusLabel = 'Second Half Leave';
                     }
                 }
+
             } else {
                 status = 'leave';
                 statusLabel = 'On Leave';
@@ -401,6 +408,8 @@ export default function MasterAttendancePage() {
             case "leave_second_half": return "Second Half Leave";
             case "available_after_leave": return "Available";
             case "available_before_leave": return "Available";
+            case "extra_work": return "Extra Working Day";
+            case "regularization": return "Regularized";
             case "absent": return "Absent";
             default: return status;
         }
@@ -425,6 +434,10 @@ export default function MasterAttendancePage() {
             case "leave_first_half":
             case "leave_second_half":
                 return { backgroundColor: "#fef3c7", color: "#b45309", borderColor: "#fde68a" }; // amber-100
+            case "extra_work":
+                return { backgroundColor: "#f3e8ff", color: "#7e22ce", borderColor: "#d8b4fe" }; // purple-100
+            case "regularization":
+                return { backgroundColor: "#dbeafe", color: "#1e40af", borderColor: "#bfdbfe" }; // blue-100 (using blue for regularization to distinguish)
             case "absent":
                 return { backgroundColor: "#fee2e2", color: "#b91c1c", borderColor: "#fecaca" }; // red-100
             default:
@@ -656,6 +669,14 @@ export default function MasterAttendancePage() {
                                 <span className="w-3 h-3 rounded-full bg-red-100 border border-red-200"></span>
                                 <span className="text-xs text-slate-600">Absent</span>
                             </div>
+                            <div className="flex items-center gap-2">
+                                <span className="w-3 h-3 rounded-full bg-purple-100 border border-purple-200"></span>
+                                <span className="text-xs text-slate-600">Extra Working Day</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="w-3 h-3 rounded-full bg-blue-100 border border-blue-200"></span>
+                                <span className="text-xs text-slate-600">Regularized</span>
+                            </div>
                             {leaveTypes.map((type) => (
                                 <div key={type.leave_type} className="flex items-center gap-2">
                                     <span
@@ -843,6 +864,26 @@ export default function MasterAttendancePage() {
                                                             const dateStr = format(day, 'yyyy-MM-dd');
                                                             const record = userRecords.find(r => r.date === dateStr);
                                                             let status = record?.status;
+
+                                                            // Find active leave/request for this date
+                                                            const activeLeave = leaves.find(l =>
+                                                                l.user_id === user.id &&
+                                                                l.status === 'approved' &&
+                                                                l.start_date <= dateStr &&
+                                                                l.end_date >= dateStr
+                                                            );
+
+                                                            if (activeLeave) {
+                                                                if (activeLeave.type === 'Extra Working Day') {
+                                                                    status = 'extra_work';
+                                                                } else if (activeLeave.type === 'Regularization') {
+                                                                    status = 'regularization';
+                                                                } else if (activeLeave.session) {
+                                                                    status = activeLeave.session === 'first_half' ? 'leave_first_half' : 'leave_second_half';
+                                                                } else {
+                                                                    status = 'leave';
+                                                                }
+                                                            }
 
                                                             // Logic for Absent
                                                             if (!status) {

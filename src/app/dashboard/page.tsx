@@ -16,9 +16,10 @@ import {
   MapPin,
   Globe,
   Palmtree,
-  AlertCircle,
   CheckCircle2,
   Info,
+  Briefcase,
+  AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -38,6 +39,7 @@ export default function DashboardPage() {
     | "available_after_leave"
     | "available_before_leave"
     | "leave_second_half"
+    | "extra_work"
     | null
   >(null);
   const [selectedStatus, setSelectedStatus] = useState<
@@ -147,9 +149,11 @@ export default function DashboardPage() {
       const leaveData = allLeaves?.[0]; // Simplified: take first approved leave
 
       if (leaveData) {
-        // ... (Keep existing complex leave logic if needed, simplify for now to focus on Check-In)
-        if (leaveData.type === "Half Day" || leaveData.session) {
-          // Re-implement if strictly needed, otherwise simplifying to 'leave' for this task scope
+        if (leaveData.type === "Extra Working Day") {
+          setStatus("extra_work" as any);
+        } else if (leaveData.type === "Regularization") {
+          setStatus("regularization" as any);
+        } else if (leaveData.type === "Half Day" || leaveData.session) {
           if (leaveData.session === "first_half") setStatus("leave_first_half");
           else if (leaveData.session === "second_half")
             setStatus("leave_second_half");
@@ -524,6 +528,22 @@ export default function DashboardPage() {
           bgColor: "bg-emerald-50",
           borderColor: "border-emerald-100",
         };
+      case "extra_work":
+        return {
+          label: "Extra Working Day",
+          icon: Briefcase,
+          color: "text-purple-600",
+          bgColor: "bg-purple-50",
+          borderColor: "border-purple-100",
+        };
+      case "regularization":
+        return {
+          label: "Regularized",
+          icon: CheckCircle2,
+          color: "text-blue-600",
+          bgColor: "bg-blue-50",
+          borderColor: "border-blue-100",
+        };
       default:
         return {
           label: "Unknown Status",
@@ -702,49 +722,100 @@ export default function DashboardPage() {
                 {/* ACTION BUTTONS */}
                 {!status ? (
                   <div className="space-y-3">
-                    <div className="grid grid-cols-3 gap-2 text-xs">
-                      <Button
-                        variant={
-                          selectedStatus === "available" ? "default" : "outline"
+                    {/* Check if today is a working day based on workConfig */}
+                    {(() => {
+                        const today = new Date();
+                        const dayOfWeek = today.getDay();
+                        let isWorkingDay = true;
+                        
+                        if (workConfig) {
+                             const wc = typeof workConfig === 'string' ? JSON.parse(workConfig) : workConfig;
+                             if (wc.mode === 'fixed' && Array.isArray(wc.fixed?.work_days)) {
+                                 isWorkingDay = wc.fixed.work_days.includes(dayOfWeek);
+                             } else if (wc.mode === 'flexible' && Array.isArray(wc.flexible?.work_days)) {
+                                 isWorkingDay = wc.flexible.work_days.includes(dayOfWeek);
+                             } else {
+                                 // Default fallback
+                                 isWorkingDay = dayOfWeek !== 0 && dayOfWeek !== 6;
+                             }
+                        } else {
+                             // No config -> Standard Weekend for default fallback
+                             isWorkingDay = dayOfWeek !== 0 && dayOfWeek !== 6;
                         }
-                        className={cn(
-                          "justify-start transition-all",
-                          selectedStatus === "available"
-                            ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600"
-                            : "hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
-                        )}
-                        onClick={() => handleStatusSelect("available")}
-                        disabled={loading || actionLoading}
-                      >
-                        <Home className="mr-2 h-4 w-4" />
-                        Office
-                      </Button>
-                      <Button
-                        variant={
-                          selectedStatus === "remote" ? "default" : "outline"
+
+                        if (!isWorkingDay) {
+                            return (
+                                <div className="space-y-3">
+                                    <div className="rounded-lg bg-slate-100 p-3 text-center text-slate-500 text-sm border border-slate-200">
+                                        <div className="flex items-center justify-center gap-2 mb-1">
+                                            <div className="h-2 w-2 rounded-full bg-slate-400"></div>
+                                            <span className="font-semibold text-slate-700">Weekly Off</span>
+                                        </div>
+                                        Today is your weekly off. 
+                                        <br/>Attendance marking is disabled.
+                                    </div>
+                                    <div className="space-y-4 pt-2">
+                                        <p className="text-xs text-center text-slate-500 font-medium">Are you working today?</p>
+                                        <Button
+                                            variant="outline"
+                                            className="w-full justify-center border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 hover:border-purple-300"
+                                            onClick={() => router.push("/leaves/extra-working-day")}
+                                            disabled={loading || actionLoading}
+                                        >
+                                            <Briefcase className="mr-2 h-4 w-4" />
+                                            Apply for Extra Working Day
+                                        </Button>
+                                    </div>
+                                </div>
+                            );
                         }
-                        className={cn(
-                          "justify-start transition-all",
-                          selectedStatus === "remote"
-                            ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
-                            : "hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-                        )}
-                        onClick={() => handleStatusSelect("remote")}
-                        disabled={loading || actionLoading}
-                      >
-                        <Globe className="mr-2 h-4 w-4" />
-                        Remote
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="justify-start hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700"
-                        onClick={() => router.push("/leaves/apply")}
-                        disabled={loading || actionLoading}
-                      >
-                        <Palmtree className="mr-2 h-4 w-4" />
-                        On leave
-                      </Button>
-                    </div>
+
+                        return (
+                            <div className="grid grid-cols-3 gap-2 text-xs">
+                              <Button
+                                variant={
+                                  selectedStatus === "available" ? "default" : "outline"
+                                }
+                                className={cn(
+                                  "justify-start transition-all",
+                                  selectedStatus === "available"
+                                    ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600"
+                                    : "hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+                                )}
+                                onClick={() => handleStatusSelect("available")}
+                                disabled={loading || actionLoading}
+                              >
+                                <Home className="mr-2 h-4 w-4" />
+                                Office
+                              </Button>
+                              <Button
+                                variant={
+                                  selectedStatus === "remote" ? "default" : "outline"
+                                }
+                                className={cn(
+                                  "justify-start transition-all",
+                                  selectedStatus === "remote"
+                                    ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
+                                    : "hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                                )}
+                                onClick={() => handleStatusSelect("remote")}
+                                disabled={loading || actionLoading}
+                              >
+                                <Globe className="mr-2 h-4 w-4" />
+                                Remote
+                              </Button>
+                              <Button
+                                variant="outline"
+                                className="justify-start hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700"
+                                onClick={() => router.push("/leaves/apply")}
+                                disabled={loading || actionLoading}
+                              >
+                                <Palmtree className="mr-2 h-4 w-4" />
+                                On leave
+                              </Button>
+                            </div>
+                        );
+                    })()}
 
                     {selectedStatus && (
                       <div className="flex animate-in fade-in slide-in-from-top-2">

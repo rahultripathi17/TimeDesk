@@ -187,7 +187,7 @@ export default function LeaveApprovalPage() {
     
     // Helper to render reason (handles JSON for Regularization)
     const renderReason = (leave: any) => {
-        if (leave.type === 'Regularization') {
+        if (leave.type === 'Regularization' || leave.type === 'Extra Working Day') {
             try {
                 const details = JSON.parse(leave.reason);
                 return (

@@ -264,7 +264,7 @@ export default function ApplyLeavePage() {
 
     // Helper to render reason (handles JSON for Regularization)
     const renderReason = (leave: any) => {
-        if (leave.type === 'Regularization') {
+        if (leave.type === 'Regularization' || leave.type === 'Extra Working Day') {
             try {
                 const details = JSON.parse(leave.reason);
                 return (
@@ -626,7 +626,7 @@ export default function ApplyLeavePage() {
                                                 <div>
                                                     <div className="flex items-center gap-2 mb-1">
                                                         <span className="font-semibold text-slate-900">
-                                                            {leave.type === 'Regularization' ? 'Regularization Attendance' : `${leave.type} Leave`}
+                                                            {leave.type === 'Regularization' ? 'Regularization Attendance' : leave.type === 'Extra Working Day' ? 'Extra Working Day' : `${leave.type} Leave`}
                                                             {leave.type === 'Half Day' && leave.session && (
                                                                 <span className="font-normal text-slate-500 ml-1">
                                                                     - {leave.session === 'first_half' ? 'First Half' : 'Second Half'}
@@ -690,7 +690,7 @@ export default function ApplyLeavePage() {
                                                 <div>
                                                     <div className="flex items-center gap-2 mb-1">
                                                         <span className="font-semibold text-slate-900">
-                                                            {leave.type === 'Regularization' ? 'Regularization Attendance' : `${leave.type} Leave`}
+                                                            {leave.type === 'Regularization' ? 'Regularization Attendance' : leave.type === 'Extra Working Day' ? 'Extra Working Day' : `${leave.type} Leave`}
                                                             {leave.type === 'Half Day' && leave.session && (
                                                                 <span className="font-normal text-slate-500 ml-1">
                                                                     - {leave.session === 'first_half' ? 'First Half' : 'Second Half'}

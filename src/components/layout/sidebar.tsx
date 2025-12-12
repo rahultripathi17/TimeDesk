@@ -28,6 +28,7 @@ import {
   Building2,
   Network,
   CalendarCheck2,
+  Briefcase,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,7 @@ const employeeExtra: NavItem[] = [
     children: [
       { label: "Apply Leave", href: "/leaves/apply", icon: CalendarPlus },
       { label: "Regularization", href: "/leaves/regularization", icon: CalendarCheck2 },
+      { label: "Extra Work", href: "/leaves/extra-working-day", icon: Briefcase },
       { label: "Leave Balance", href: "/leaves/balance", icon: Scale },
     ],
   },
@@ -80,6 +82,7 @@ const managerExtra: NavItem[] = [
     children: [
       { label: "Apply Leave", href: "/leaves/apply", icon: CalendarPlus },
       { label: "Regularization", href: "/leaves/regularization", icon: CalendarCheck2 },
+      { label: "Extra Work", href: "/leaves/extra-working-day", icon: Briefcase },
       { label: "Leave Balance", href: "/leaves/balance", icon: Scale },
       {
         label: "Approvals",
@@ -101,6 +104,7 @@ const hrExtra: NavItem[] = [
     children: [
       { label: "Apply Leave", href: "/leaves/apply", icon: CalendarPlus },
       { label: "Regularization", href: "/leaves/regularization", icon: CalendarCheck2 },
+      { label: "Extra Work", href: "/leaves/extra-working-day", icon: Briefcase },
       { label: "Leave Balance", href: "/leaves/balance", icon: Scale },
       {
         label: "Approvals",

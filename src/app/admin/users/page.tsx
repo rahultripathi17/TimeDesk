@@ -172,6 +172,21 @@ export default function UsersListPage() {
                 const activeLeave = user.leaves?.find((l: any) =>
                     l.status === 'approved' &&
                     l.type !== 'Regularization' && // Regularization is not a leave
+                    l.type !== 'Extra Working Day' && // Extra Working Day is not a leave
+                    l.start_date <= today &&
+                    l.end_date >= today
+                );
+
+                const extraWork = user.leaves?.find((l: any) =>
+                    l.status === 'approved' &&
+                    l.type === 'Extra Working Day' &&
+                    l.start_date <= today &&
+                    l.end_date >= today
+                );
+
+                const regularization = user.leaves?.find((l: any) =>
+                    l.status === 'approved' &&
+                    l.type === 'Regularization' &&
                     l.start_date <= today &&
                     l.end_date >= today
                 );
@@ -222,6 +237,10 @@ export default function UsersListPage() {
                     } else {
                         status = 'leave';
                     }
+                } else if (extraWork) {
+                    status = 'extra_work';
+                } else if (regularization) {
+                    status = 'regularization';
                 } else if (todayAttendance) {
                     status = todayAttendance.status;
                 }
@@ -301,7 +320,14 @@ export default function UsersListPage() {
             case "available":
             case "available_after_leave":
             case "available_before_leave":
+            case "available":
+            case "available_after_leave":
+            case "available_before_leave":
                 return "bg-green-100 text-green-700 hover:bg-green-100";
+            case "extra_work":
+                return "bg-purple-100 text-purple-700 hover:bg-purple-100";
+            case "regularization":
+                return "bg-blue-100 text-blue-700 hover:bg-blue-100";
             case "remote":
                 return "bg-blue-100 text-blue-700 hover:bg-blue-100";
             case "leave":
@@ -324,6 +350,8 @@ export default function UsersListPage() {
             case "leave": return "On Leave";
             case "leave_first_half": return "Available after 1:00 PM"; // Fallback
             case "leave_second_half": return "On Half Day Leave";
+            case "extra_work": return "Extra Working Day";
+            case "regularization": return "Regularized";
             case "available_after_leave": return "Available";
             case "available_before_leave": return "Available till 1:00 PM"; // Fallback
             case "absent": return "Absent";
