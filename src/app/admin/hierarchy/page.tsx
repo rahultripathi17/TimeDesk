@@ -539,7 +539,7 @@ export default function HierarchyPage() {
                     <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Available Managers</Label>
                     <div className="bg-white border rounded-lg max-h-[240px] overflow-y-auto p-1 space-y-1">
                         {profiles
-                            .filter(p => p.id !== selectedUser?.id) // Prevent self-assignment
+                            .filter(p => p.id !== selectedUser?.id && p.role !== 'employee') // Prevent self-assignment and exclude employees
                             .map(p => {
                                 const isSelected = newManagerIds.includes(p.id);
                                 return (

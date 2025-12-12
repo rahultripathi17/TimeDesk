@@ -603,8 +603,8 @@ export default function DashboardPage() {
       // Default to Mon-Fri if work_days not present
       const daysArr = workConfig.flexible?.work_days || [1, 2, 3, 4, 5];
       return {
-        time: `Flexible (${hours} hrs/day)`,
-        type: "Flexible",
+        time: `${hours} Hrs / Day`,
+        type: "Flexible Shift",
         days: formatWorkingDays(daysArr),
         off: getOffDays(daysArr),
       };
@@ -613,7 +613,7 @@ export default function DashboardPage() {
     if (!workConfig?.fixed)
       return {
         time: "09:00 AM - 05:00 PM",
-        type: "Standard",
+        type: "Fixed Shift",
         days: "Mon - Fri",
         off: "Sat, Sun",
       };
@@ -631,6 +631,7 @@ export default function DashboardPage() {
       time: `${formatTime(workConfig.fixed.start_time)} - ${formatTime(
         workConfig.fixed.end_time
       )}`,
+      type: "Fixed Shift",
       days: formatWorkingDays(daysArr),
       off: getOffDays(daysArr),
     };
@@ -875,10 +876,18 @@ export default function DashboardPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col justify-center h-full min-h-[140px] space-y-4">
-                <div className="text-center space-y-1">
+                <div className="text-center space-y-2">
                   <p className="text-2xl font-bold text-slate-900 tracking-tight">
                     {schedule.time}
                   </p>
+                  <span className={cn(
+                    "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                    schedule.type.includes("Fixed") 
+                      ? "bg-violet-100 text-violet-700 hover:bg-violet-200" 
+                      : "bg-fuchsia-100 text-fuchsia-700 hover:bg-fuchsia-200"
+                  )}>
+                    {schedule.type}
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 border-t pt-3">

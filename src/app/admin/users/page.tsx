@@ -123,7 +123,7 @@ export default function UsersListPage() {
                 .select(`
                     *,
                     user_details (*),
-                    attendance (
+                    attendance:attendance!attendance_user_id_fkey (
                         status,
                         date
                     ),
@@ -171,6 +171,7 @@ export default function UsersListPage() {
                 // 2. Check Leaves (Priority)
                 const activeLeave = user.leaves?.find((l: any) =>
                     l.status === 'approved' &&
+                    l.type !== 'Regularization' && // Regularization is not a leave
                     l.start_date <= today &&
                     l.end_date >= today
                 );
