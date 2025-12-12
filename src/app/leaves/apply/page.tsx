@@ -262,6 +262,27 @@ export default function ApplyLeavePage() {
         }
     };
 
+    // Helper to render reason (handles JSON for Regularization)
+    const renderReason = (leave: any) => {
+        if (leave.type === 'Regularization') {
+            try {
+                const details = JSON.parse(leave.reason);
+                return (
+                    <div className="flex flex-col gap-1 mt-1">
+                        <span className="italic">"{details.reason}"</span>
+                        <div className="flex flex-wrap gap-1 text-[10px] text-slate-500 font-mono">
+                            <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">In: {details.checkIn}</span>
+                            <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">Out: {details.checkOut}</span>
+                        </div>
+                    </div>
+                );
+            } catch (e) {
+                return <span className="italic">"{leave.reason}"</span>;
+            }
+        }
+        return <span className="italic">"{leave.reason}"</span>;
+    };
+
     return (
         <AppShell role={(userRole as "employee" | "manager" | "hr" | "admin") || "employee"}>
             <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:py-8">
@@ -605,7 +626,7 @@ export default function ApplyLeavePage() {
                                                 <div>
                                                     <div className="flex items-center gap-2 mb-1">
                                                         <span className="font-semibold text-slate-900">
-                                                            {leave.type} Leave
+                                                            {leave.type === 'Regularization' ? 'Regularization Attendance' : `${leave.type} Leave`}
                                                             {leave.type === 'Half Day' && leave.session && (
                                                                 <span className="font-normal text-slate-500 ml-1">
                                                                     - {leave.session === 'first_half' ? 'First Half' : 'Second Half'}
@@ -626,7 +647,9 @@ export default function ApplyLeavePage() {
                                                         Waiting for approval from <span className="font-medium text-slate-600">{leave.approver?.full_name || "Manager"}</span>
                                                     </p>
                                                     {leave.reason && (
-                                                        <p className="text-xs text-slate-400 mt-1 italic">"{leave.reason}"</p>
+                                                        <div className="text-xs text-slate-400 mt-1">
+                                                            {renderReason(leave)}
+                                                        </div>
                                                     )}
                                                 </div>
                                                 <Button
@@ -667,7 +690,7 @@ export default function ApplyLeavePage() {
                                                 <div>
                                                     <div className="flex items-center gap-2 mb-1">
                                                         <span className="font-semibold text-slate-900">
-                                                            {leave.type} Leave
+                                                            {leave.type === 'Regularization' ? 'Regularization Attendance' : `${leave.type} Leave`}
                                                             {leave.type === 'Half Day' && leave.session && (
                                                                 <span className="font-normal text-slate-500 ml-1">
                                                                     - {leave.session === 'first_half' ? 'First Half' : 'Second Half'}
@@ -694,6 +717,11 @@ export default function ApplyLeavePage() {
                                                         <p className="text-xs text-slate-400 mt-1">
                                                             {leave.status === 'approved' ? 'Approved' : 'Rejected'} by <span className="font-medium text-slate-600">{leave.approver.full_name}</span>
                                                         </p>
+                                                    )}
+                                                    {leave.reason && (
+                                                        <div className="text-xs text-slate-400 mt-1">
+                                                            {renderReason(leave)}
+                                                        </div>
                                                     )}
                                                 </div>
                                                 <div className="text-right text-xs text-slate-400">

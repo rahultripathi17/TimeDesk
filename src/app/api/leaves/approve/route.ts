@@ -43,27 +43,58 @@ export async function POST(req: NextRequest) {
             const endDate = parseISO(leave.end_date);
             const userId = leave.user_id;
 
-            // Get all dates in the range
-            const dates = eachDayOfInterval({ start: startDate, end: endDate });
+            // SPECIAL HANDLING FOR REGULARIZATION
+            if (leave.type === 'Regularization') {
+                try {
+                    // Start date is the regularization date (single day usually)
+                    const dateStr = format(startDate, 'yyyy-MM-dd');
+                    
+                    // Parse Reason JSON
+                    const details = JSON.parse(leave.reason);
+                    const { checkIn, checkOut } = details;
 
-            // Prepare upsert data
-            const attendanceUpdates = dates.map(date => ({
-                user_id: userId,
-                date: format(date, 'yyyy-MM-dd'),
-                status: 'leave',
-                // We don't set check_in/check_out for leaves
-            }));
+                    if (checkIn && checkOut) {
+                         // Construct Timestamps
+                        const checkInTime = new Date(`${dateStr}T${checkIn}:00`);
+                        const checkOutTime = new Date(`${dateStr}T${checkOut}:00`);
 
-            // Upsert into attendance table
-            // We use upsert to handle cases where a record might already exist (e.g. marked as absent)
-            const { error: attendanceError } = await supabaseAdmin
-                .from('attendance')
-                .upsert(attendanceUpdates, { onConflict: 'user_id, date' });
+                        // Upsert attendance as PRESENT ('available')
+                        const { error: regError } = await supabaseAdmin
+                            .from('attendance')
+                            .upsert({
+                                user_id: userId,
+                                date: dateStr,
+                                status: 'available', // Mark as Present
+                                check_in: checkInTime.toISOString(),
+                                check_out: checkOutTime.toISOString()
+                            }, { onConflict: 'user_id, date' });
 
-            if (attendanceError) {
-                console.error("Error updating attendance:", attendanceError);
-                // We don't fail the request here, but we should log it. 
-                // Ideally we might want to rollback the leave update, but for now we'll proceed.
+                         if (regError) console.error("Error regularizing attendance:", regError);
+                    }
+                } catch (e) {
+                    console.error("Failed to parse regularization details", e);
+                }
+            } else {
+                // NORMAL LEAVE LOGIC
+                // Get all dates in the range
+                const dates = eachDayOfInterval({ start: startDate, end: endDate });
+
+                // Prepare upsert data
+                const attendanceUpdates = dates.map(date => ({
+                    user_id: userId,
+                    date: format(date, 'yyyy-MM-dd'),
+                    status: 'leave',
+                    // We don't set check_in/check_out for leaves
+                }));
+
+                // Upsert into attendance table
+                const { error: attendanceError } = await supabaseAdmin
+                    .from('attendance')
+                    .upsert(attendanceUpdates, { onConflict: 'user_id, date' });
+
+                if (attendanceError) {
+                    console.error("Error updating attendance:", attendanceError);
+                }
             }
         }
 

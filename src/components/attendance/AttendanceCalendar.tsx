@@ -35,6 +35,7 @@ type AttendanceRecord = {
     color?: string; // Dynamic color
     label?: string; // Dynamic label
     session?: string;
+    isRegularized?: boolean;
 };
 
 type StatusStyle = {
@@ -197,6 +198,24 @@ export function AttendanceCalendar({ userId }: { userId?: string }) {
 
                     // Only if within current month view
                     if (dateStr >= monthStartStr && dateStr <= monthEndStr) {
+                        
+                        // Handle Regularization differently
+                        if (leave.type === 'Regularization') {
+                            const existingIndex = processedRecords.findIndex(r => r.date === dateStr);
+                            if (existingIndex !== -1) {
+                                // Mark existing record as regularized
+                                processedRecords[existingIndex].isRegularized = true;
+                            } else {
+                                // Should be present in attendance if approved, but if not, add it
+                                processedRecords.push({
+                                    date: dateStr,
+                                    status: 'OFFICE', // Assume present
+                                    isRegularized: true
+                                });
+                            }
+                            continue; // Skip standard leave processing
+                        }
+
                         // Find leave type color (Case Insensitive Match)
                         const leaveTypeInfo = leaveTypes.find(lt =>
                             lt.leave_type.trim().toLowerCase() === leave.type.trim().toLowerCase()
@@ -376,7 +395,7 @@ export function AttendanceCalendar({ userId }: { userId?: string }) {
                 <div
                     key={day.toISOString()}
                     className={cn(
-                        "flex min-h-[60px] sm:min-h-[72px] lg:min-h-[82px] w-full flex-col border border-slate-100 p-1.5 sm:p-2 text-left text-[10px] sm:text-xs transition-colors",
+                        "flex min-h-[60px] sm:min-h-[72px] lg:min-h-[82px] w-full flex-col border border-slate-100 p-1.5 sm:p-2 text-left text-[10px] sm:text-xs transition-colors relative",
                         !inMonth && "bg-slate-50/70 text-slate-300",
                         effectiveStyle && !rec?.color && !rec?.session && inMonth && `${effectiveStyle.bg} ${effectiveStyle.border}`,
                         !effectiveStyle && inMonth && "bg-white",
@@ -422,6 +441,15 @@ export function AttendanceCalendar({ userId }: { userId?: string }) {
                         <div className="mt-1.5 text-[10px] text-slate-400">
                             {isBeforeJoining ? "Not Registered" : "-"}
                         </div>
+                    )}
+
+                    {/* Regularization Triangle (Bottom Right) */}
+                    {rec?.isRegularized && (
+                        <div 
+                            className="absolute bottom-1 right-1 h-2 w-2 bg-black" 
+                            style={{ clipPath: 'polygon(100% 0, 0 100%, 100% 100%)' }}
+                            title="Regularized Attendance"
+                        />
                     )}
                 </div>
             );

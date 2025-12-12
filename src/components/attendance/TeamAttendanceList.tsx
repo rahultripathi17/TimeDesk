@@ -88,7 +88,7 @@ export function TeamAttendanceList({ role, departmentFilter: initialDepartmentFi
                 .from('profiles')
                 .select(`
                   *,
-                  attendance (
+                  attendance:attendance!attendance_user_id_fkey (
                     status,
                     date
                   ),
@@ -138,6 +138,7 @@ export function TeamAttendanceList({ role, departmentFilter: initialDepartmentFi
                 // Check Leaves First (Priority)
                 const activeLeave = u.leaves?.find((l: any) =>
                     l.status === 'approved' &&
+                    l.type !== 'Regularization' && // Regularization is not a leave
                     l.start_date <= today &&
                     l.end_date >= today
                 );

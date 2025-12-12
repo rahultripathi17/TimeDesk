@@ -184,6 +184,27 @@ export default function LeaveApprovalPage() {
             setProcessingId(null);
         }
     };
+    
+    // Helper to render reason (handles JSON for Regularization)
+    const renderReason = (leave: any) => {
+        if (leave.type === 'Regularization') {
+            try {
+                const details = JSON.parse(leave.reason);
+                return (
+                    <div className="flex flex-col gap-1">
+                        <span>{details.reason}</span>
+                        <div className="flex flex-wrap gap-1 text-[10px] text-slate-500 font-mono mt-0.5">
+                            <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">In: {details.checkIn}</span>
+                            <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">Out: {details.checkOut}</span>
+                        </div>
+                    </div>
+                );
+            } catch (e) {
+                return leave.reason;
+            }
+        }
+        return leave.reason;
+    };
 
     return (
         <AppShell role={userRole as any}>
@@ -269,8 +290,8 @@ export default function LeaveApprovalPage() {
                                                                 )}
                                                             </div>
                                                         </TableCell>
-                                                        <TableCell className="max-w-[200px] text-xs text-slate-600 truncate" title={leave.reason}>
-                                                            {leave.reason}
+                                                        <TableCell className="max-w-[200px] text-xs text-slate-600 truncate" title={typeof leave.reason === 'string' && leave.reason.startsWith('{') ? 'Regularization Request' : leave.reason}>
+                                                            {renderReason(leave)}
                                                         </TableCell>
                                                         <TableCell className="text-right">
                                                             <div className="flex justify-end gap-2">
@@ -377,7 +398,7 @@ export default function LeaveApprovalPage() {
 
                                                 {leave.reason && (
                                                     <div className="bg-slate-50 p-3 rounded text-xs text-slate-600 italic">
-                                                        "{leave.reason}"
+                                                        {renderReason(leave)}
                                                     </div>
                                                 )}
 

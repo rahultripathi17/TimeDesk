@@ -34,8 +34,8 @@ export async function GET(request: Request) {
         let query = supabase
             .from("attendance")
             .select(`
-        *,
-        profiles!inner (
+            *,
+        profiles:profiles!attendance_user_id_fkey!inner (
           id,
           full_name,
           department,

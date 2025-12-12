@@ -27,6 +27,7 @@ import {
   MapPin,
   Building2,
   Network,
+  CalendarCheck2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,7 @@ const employeeExtra: NavItem[] = [
     icon: CalendarPlus,
     children: [
       { label: "Apply Leave", href: "/leaves/apply", icon: CalendarPlus },
+      { label: "Regularization", href: "/leaves/regularization", icon: CalendarCheck2 },
       { label: "Leave Balance", href: "/leaves/balance", icon: Scale },
     ],
   },
@@ -77,6 +79,7 @@ const managerExtra: NavItem[] = [
     icon: CalendarPlus,
     children: [
       { label: "Apply Leave", href: "/leaves/apply", icon: CalendarPlus },
+      { label: "Regularization", href: "/leaves/regularization", icon: CalendarCheck2 },
       { label: "Leave Balance", href: "/leaves/balance", icon: Scale },
       {
         label: "Approvals",
@@ -97,6 +100,7 @@ const hrExtra: NavItem[] = [
     icon: CalendarPlus,
     children: [
       { label: "Apply Leave", href: "/leaves/apply", icon: CalendarPlus },
+      { label: "Regularization", href: "/leaves/regularization", icon: CalendarCheck2 },
       { label: "Leave Balance", href: "/leaves/balance", icon: Scale },
       {
         label: "Approvals",
