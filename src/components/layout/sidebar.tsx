@@ -89,6 +89,12 @@ const managerExtra: NavItem[] = [
     href: "/admin/leaves",
     icon: CalendarPlus,
     children: [
+      {
+        label: "Approvals",
+        href: "/admin/leaves",
+        icon: ClipboardCheck,
+        exact: true,
+      },
       { label: "Apply Leave", href: "/leaves/apply", icon: CalendarPlus },
       {
         label: "Regularization",
@@ -101,12 +107,6 @@ const managerExtra: NavItem[] = [
         icon: Briefcase,
       },
       { label: "Leave Balance", href: "/leaves/balance", icon: Scale },
-      {
-        label: "Approvals",
-        href: "/admin/leaves",
-        icon: ClipboardCheck,
-        exact: true,
-      },
     ],
   },
 ];
@@ -119,6 +119,12 @@ const hrExtra: NavItem[] = [
     href: "/leaves/apply",
     icon: CalendarPlus,
     children: [
+      {
+        label: "Approvals",
+        href: "/admin/leaves",
+        icon: ClipboardCheck,
+        exact: true,
+      },
       { label: "Apply Leave", href: "/leaves/apply", icon: CalendarPlus },
       {
         label: "Regularization",
@@ -131,12 +137,6 @@ const hrExtra: NavItem[] = [
         icon: Briefcase,
       },
       { label: "Leave Balance", href: "/leaves/balance", icon: Scale },
-      {
-        label: "Approvals",
-        href: "/admin/leaves",
-        icon: ClipboardCheck,
-        exact: true,
-      },
     ],
   },
   { label: "Reports", href: "/hr/reports", icon: BarChart3 },
@@ -144,6 +144,7 @@ const hrExtra: NavItem[] = [
 ];
 
 const adminExtra: NavItem[] = [
+  // People & Organization
   { label: "Users & Roles", href: "/admin/users", icon: Users, exact: true },
   {
     label: "Add New User",
@@ -151,30 +152,34 @@ const adminExtra: NavItem[] = [
     icon: UserPlus,
     exact: true,
   },
+  { label: "Hierarchy", href: "/admin/hierarchy", icon: Network },
   { label: "Teams & Depts", href: "/admin/teams", icon: Users },
   { label: "Add Department", href: "/admin/departments", icon: Building2 },
   { label: "Office Locations", href: "/admin/locations", icon: MapPin },
+
+  // Attendance & Time
   { label: "Master Attendance", href: "/admin/attendance", icon: CalendarDays },
+  { label: "Holiday Calendar", href: "/admin/holidays", icon: Palmtree },
   {
     label: "Leaves",
     href: "/admin/leaves",
     icon: CalendarPlus,
     children: [
-      { label: "Limits", href: "/admin/leaves/limits", icon: ShieldCheck },
       {
         label: "Approvals",
         href: "/admin/leaves",
         icon: ClipboardCheck,
         exact: true,
       },
+      { label: "Limits", href: "/admin/leaves/limits", icon: ShieldCheck },
       { label: "Reset Balances", href: "/admin/leaves/reset", icon: RotateCcw },
     ],
   },
+
+  // Insights & Settings
   { label: "Reports", href: "/admin/reports", icon: BarChart3 },
-  { label: "Holiday Calendar", href: "/admin/holidays", icon: Palmtree },
   { label: "Policies", href: "/admin/policies", icon: ShieldCheck },
   { label: "Notice Board", href: "/admin/settings", icon: Megaphone },
-  { label: "Hierarchy", href: "/admin/hierarchy", icon: Network },
 ];
 export function navForRole(role: Role): NavItem[] {
   switch (role) {

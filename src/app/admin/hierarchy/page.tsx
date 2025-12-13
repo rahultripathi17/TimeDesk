@@ -115,20 +115,50 @@ export default function HierarchyPage() {
   };
 
 
-  // --- Zoom & Full Screen ---
+  // --- Zoom & Pan ---
   const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
   const [isFullScreen, setIsFullScreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 2));
-  const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.5));
-  // Mouse Wheel Zoom
+  const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.2));
+
   const handleWheel = (e: React.WheelEvent) => {
-      if (isFullScreen || e.ctrlKey) {
+      // Zoom on Control + Wheel or just Wheel if specific mode? 
+      // User asked for "mouse control", usually wheel = zoom, drag = pan.
+      if (e.ctrlKey) {
           e.preventDefault();
           const delta = e.deltaY > 0 ? -0.1 : 0.1;
-          setZoom(prev => Math.min(Math.max(prev + delta, 0.2), 3)); 
+          setZoom(prev => Math.min(Math.max(prev + delta, 0.2), 3));
+      } else {
+          // Pan on wheel if not ctrl? Standard is vertical scroll. 
+          // But for infinite canvas, wheel usually zooms or pans vertically.
+          // Let's stick to Drag for Pan, Wheel for Zoom (Canva style typically uses Ctrl+Wheel to zoom, Wheel to pan).
+          // Actually Canva: Wheel = Scroll (Pan), Ctrl+Wheel = Zoom.
+          e.preventDefault();
+          setPan(prev => ({ x: prev.x - e.deltaX, y: prev.y - e.deltaY }));
       }
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+      if (e.button !== 0) return; // Only left click
+      setIsDragging(true);
+      setLastMousePos({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+      if (!isDragging) return;
+      const dx = e.clientX - lastMousePos.x;
+      const dy = e.clientY - lastMousePos.y;
+      setPan(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+      setLastMousePos({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleMouseUp = () => {
+      setIsDragging(false);
   };
 
   const toggleFullScreen = () => {
@@ -152,7 +182,6 @@ export default function HierarchyPage() {
   }, []);
 
   // --- Graph Construction & Analysis ---
-
   const managerMap = new Map<string, string[]>(); // Manager ID -> Child IDs
   const parentMap = new Map<string, string[]>();  // Child ID -> Manager IDs
   const profileMap = new Map<string, Profile>();
@@ -186,7 +215,17 @@ export default function HierarchyPage() {
   // Identify Roots (No parents in the current set or Admin/HR fallback)
   const potentialRoots = profiles.filter(p => {
       const parents = parentMap.get(p.id);
-      return !parents || parents.length === 0;
+      const hasParents = parents && parents.length > 0;
+      
+      if (hasParents) return false;
+
+      // It is a root if it has no parents AND (it has children OR it is an Admin/HR)
+      const hasChildren = managerMap.has(p.id) && managerMap.get(p.id)!.length > 0;
+      
+      if (hasChildren) return true;
+      if (p.role === 'admin' || p.role === 'hr') return true;
+      
+      return false; // Isolated leaf node -> Unassigned
   });
   
   // Prioritize Admin/HR as level 0 if possible, but structure dictates first
@@ -196,21 +235,12 @@ export default function HierarchyPage() {
       processed.add(r.id);
   });
   
-  // Ensure we catch disconnected sub-roots if strict roots missed them? 
-  // For now, standard flow.
-
   // BFS to assign levels
   while (queue.length > 0) {
       const { id, level } = queue.shift()!;
       const children = managerMap.get(id) || [];
       
       children.forEach(childId => {
-          // A child's level is Max(Parent Levels) + 1. 
-          // We can't be sure we visited all parents yet, but in a DAG we might need to wait.
-          // Simple BFS approximation: Level = ParentLevel + 1.
-          // Handling multi-parent: If we visit again with a higher level, update it?
-          // To keep it simple: Use the deepest path (Critical Path).
-          
           const currentLevel = levels.get(childId) || 0;
           const newLevel = level + 1;
           
@@ -284,6 +314,10 @@ export default function HierarchyPage() {
   // Update Lines Effect (Show ALL Direct Managers)
   useEffect(() => {
      const timer = setTimeout(() => {
+         // Need container rect to calculate relative positions properly
+         if (!containerRef.current) return;
+         const containerRect = containerRef.current.getBoundingClientRect();
+
          const newLines: { x1: number, y1: number, x2: number, y2: number, key: string }[] = [];
          
          // Iterate parents to children
@@ -295,23 +329,24 @@ export default function HierarchyPage() {
                  const childEl = cardRefs.current.get(childId);
                  if (!childEl) return;
                  
-                 const pX = parentEl.offsetLeft + parentEl.offsetWidth / 2;
-                 const pY = parentEl.offsetTop + parentEl.offsetHeight; // Bottom center
+                 const pRect = parentEl.getBoundingClientRect();
+                 const cRect = childEl.getBoundingClientRect();
+
+                 // Calculate relative coordinates inside the zoomed container
+                 // Formula: (ScreenPos - ContainerScreenPos - PanOffset) / Zoom
+                 const pX = (pRect.left + pRect.width / 2 - containerRect.left - pan.x) / zoom;
+                 const pY = (pRect.bottom - containerRect.top - pan.y) / zoom;
                  
-                 const cX = childEl.offsetLeft + childEl.offsetWidth / 2;
-                 const cY = childEl.offsetTop; // Top center
+                 const cX = (cRect.left + cRect.width / 2 - containerRect.left - pan.x) / zoom;
+                 const cY = (cRect.top - containerRect.top - pan.y) / zoom;
                  
                  newLines.push({ x1: pX, y1: pY, x2: cX, y2: cY, key: `${parentId}-${childId}` });
              });
          });
          setLines(newLines);
-     }, 100);
+     }, 100); // Small debounce/delay to allow layout to settle
      return () => clearTimeout(timer);
-  }, [profiles, layers, zoom, isFullScreen]);
-
-
-
-
+  }, [profiles, layers, zoom, pan, isFullScreen]); // Added pan to dependencies as it affects calculation if using Rects
 
   const [hoveredProfileId, setHoveredProfileId] = useState<string | null>(null);
 
@@ -381,42 +416,67 @@ export default function HierarchyPage() {
         </div>
       );
   };
+  
+  // Custom Reset View
+  const handleResetView = () => {
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
+  };
 
   return (
-    <div className="p-8 min-h-screen bg-slate-50/50">
-      <div className="flex items-center justify-between mb-8 sticky top-0 bg-slate-50/95 backdrop-blur z-50 py-4 border-b">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Organization Hierarchy</h1>
-          <p className="text-slate-500 mt-1">
-              {profiles.length} Employees • {unassignedProfiles.length} Unassigned
-          </p>
+    <div className="flex flex-col h-[calc(100vh-64px)] bg-slate-50/50 overflow-hidden">
+      {/* Header */}
+      {!isFullScreen && (
+        <div className="flex items-center justify-between px-8 py-4 bg-white border-b z-20 shadow-sm shrink-0">
+            <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Organization Hierarchy</h1>
+            <p className="text-slate-500 text-sm mt-1">
+                {profiles.length} Employees • {unassignedProfiles.length} Unassigned
+            </p>
+            </div>
+            <div className="flex gap-3 items-center">
+                <Button onClick={fetchProfiles} variant="outline" size="sm">
+                    <Network className="mr-2 h-4 w-4" />
+                    Refresh
+                </Button>
+            </div>
         </div>
-        <div className="flex gap-3 items-center">
-             {/* Header Refresh Button */}
-            <Button onClick={fetchProfiles} variant="default">
-                <Network className="mr-2 h-4 w-4" />
-                Refresh
-            </Button>
-        </div>
-      </div>
+      )}
 
+      {/* Infinite Canvas Container */}
       <div 
           ref={containerRef}
-          className="transition-all duration-300 ease-in-out border rounded-xl bg-slate-100/50 relative overflow-hidden mb-12 min-h-[600px]"
+          className={`relative flex-1 bg-slate-100 overflow-hidden cursor-grab active:cursor-grabbing select-none ${isFullScreen ? "h-screen w-screen" : ""}`}
           onWheel={handleWheel}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
       >
-          {/* Floating Toolbar */}
-          <div className="absolute bottom-6 right-6 z-50 flex flex-col gap-2 p-2 bg-white/90 backdrop-blur shadow-lg border rounded-lg">
+          {/* Grid Background Pattern */}
+          <div className="absolute inset-0 pointer-events-none opacity-[0.03]"
+               style={{
+                   backgroundImage: `radial-gradient(#000 1px, transparent 1px)`,
+                   backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
+                   backgroundPosition: `${pan.x}px ${pan.y}px`
+               }} 
+          />
+
+          {/* Controls Toolbar - Positioned Top Right */}
+          <div className="absolute top-6 right-6 z-50 flex flex-col gap-2 p-1.5 bg-white shadow-xl border rounded-lg ring-1 ring-slate-900/5">
               <Button variant="ghost" size="icon" onClick={handleZoomIn} title="Zoom In">
                   <Plus className="h-4 w-4" />
               </Button>
-              <div className="text-xs font-mono py-1 text-center font-medium border-y border-slate-100">
+              <div className="text-xs font-mono py-1 text-center font-medium border-y border-slate-100 text-slate-500">
                   {Math.round(zoom * 100)}%
               </div>
               <Button variant="ghost" size="icon" onClick={handleZoomOut} title="Zoom Out">
                   <Minus className="h-4 w-4" />
               </Button>
               <div className="h-px bg-slate-200 my-1" />
+              <Button variant="ghost" size="icon" onClick={handleResetView} title="Reset View">
+                   <Zap className="h-4 w-4" />
+              </Button>
               <Button 
                 variant="ghost" 
                 size="icon" 
@@ -428,73 +488,81 @@ export default function HierarchyPage() {
               </Button>
           </div>
 
-          <div className="absolute inset-0 overflow-auto cursor-grab active:cursor-grabbing p-20">
-              <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top center', transition: 'transform 0.2s' }} className="relative min-w-max mx-auto pb-40">
+          {/* Canvas Content Layer */}
+          <div 
+            style={{ 
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, 
+                transformOrigin: '0 0', 
+                transition: isDragging ? 'none' : 'transform 0.1s ease-out' 
+            }} 
+            className="absolute top-0 left-0 w-full h-full" // Use exact coords
+          >
                  
-                 {/* Vector Layer for Connectors */}
-                 <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible" style={{ zIndex: 0 }}>
-                     <defs>
-                         <marker id="arrowhead" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
-                             <polygon points="0 0, 6 2, 0 4" fill="#cbd5e1" />
-                         </marker>
-                         <marker id="arrowhead-active" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
-                             <polygon points="0 0, 6 2, 0 4" fill="#6366f1" />
-                         </marker>
-                     </defs>
-                     {lines.map((line) => {
-                         const isActive = hoveredProfileId && (line.key.startsWith(hoveredProfileId + '-') || line.key.endsWith('-' + hoveredProfileId));
-                         const isFaded = hoveredProfileId && !isActive;
-                         
-                         return (
-                             <path
-                                 key={line.key}
-                                 d={`M ${line.x1} ${line.y1} C ${line.x1} ${line.y1 + 50}, ${line.x2} ${line.y2 - 50}, ${line.x2} ${line.y2}`}
-                                 stroke={isActive ? "#6366f1" : "#cbd5e1"}
-                                 strokeWidth={isActive ? "3" : "2"}
-                                 fill="none"
-                                 markerEnd={isActive ? "url(#arrowhead-active)" : "url(#arrowhead)"}
-                                 className={`transition-all duration-300 ${isFaded ? "opacity-10" : "opacity-100"}`}
-                                 style={{ zIndex: isActive ? 50 : 0 }}
-                             />
-                         );
-                     })}
-                 </svg>
+                 {/* 1. Main Hierarchy Tree (Centered initially effectively by layout, but we pan to move) */}
+                 <div className="relative min-w-max mx-auto pt-20 pb-40 px-20 flex flex-col items-center">
+                     
+                     {/* Lines SVG */}
+                     <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible" style={{ zIndex: 0 }}>
+                         <defs>
+                             <marker id="arrowhead" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
+                                 <polygon points="0 0, 6 2, 0 4" fill="#cbd5e1" />
+                             </marker>
+                             <marker id="arrowhead-active" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
+                                 <polygon points="0 0, 6 2, 0 4" fill="#6366f1" />
+                             </marker>
+                         </defs>
+                         {lines.map((line) => {
+                             const isActive = hoveredProfileId && (line.key.startsWith(hoveredProfileId + '-') || line.key.endsWith('-' + hoveredProfileId));
+                             const isFaded = hoveredProfileId && !isActive;
+                             
+                             return (
+                                 <path
+                                     key={line.key}
+                                     d={`M ${line.x1} ${line.y1} C ${line.x1} ${line.y1 + 80}, ${line.x2} ${line.y2 - 80}, ${line.x2} ${line.y2}`}
+                                     stroke={isActive ? "#6366f1" : "#cbd5e1"}
+                                     strokeWidth={isActive ? "3" : "2"}
+                                     fill="none"
+                                     markerEnd={isActive ? "url(#arrowhead-active)" : "url(#arrowhead)"}
+                                     className={`transition-all duration-300 ${isFaded ? "opacity-10" : "opacity-100"}`}
+                                 />
+                             );
+                         })}
+                     </svg>
 
-                 {/* Layered Cards Render */}
-                 <div className="flex flex-col gap-24 relative z-10">
-                     {layers.map((layer, lvlIndex) => (
-                         <div key={lvlIndex} className="flex justify-center gap-16">
-                             {layer.map(profile => (
-                                 <NodeCard key={profile.id} profile={profile} />
-                             ))}
-                         </div>
-                     ))}
-                     {layers.length === 0 && (
-                         <div className="text-center text-slate-400 p-10">No hierarchy data available</div>
-                     )}
+                     {/* Cards Layers */}
+                     <div className="flex flex-col gap-24 relative z-10 items-center">
+                         {layers.map((layer, lvlIndex) => (
+                             <div key={lvlIndex} className="flex justify-center gap-16">
+                                 {layer.map(profile => (
+                                     <NodeCard key={profile.id} profile={profile} />
+                                 ))}
+                             </div>
+                         ))}
+                         {layers.length === 0 && (
+                             <div className="text-center text-slate-400 p-10 bg-white/50 rounded-xl border border-dashed">No hierarchy data available</div>
+                         )}
+                     </div>
+
+                     {/* 2. Unassigned Users Section (On the same canvas, below the tree) */}
+                     {unassignedProfiles.length > 0 && (
+                        <div className="mt-32 pt-12 border-t-2 border-dashed border-slate-200 w-full max-w-5xl">
+                            <h2 className="text-lg font-bold text-slate-400 mb-8 flex items-center justify-center gap-2 uppercase tracking-widest text-center">
+                                <UserCog className="h-5 w-5" />
+                                Unassigned / Disconnected
+                            </h2>
+                            
+                            <div className="flex flex-wrap justify-center gap-6 opacity-80">
+                                {unassignedProfiles.map(p => (
+                                    <div key={p.id} className="scale-90 opacity-70 hover:opacity-100 transition-opacity">
+                                        <NodeCard profile={p} />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                  </div>
-
-              </div>
           </div>
       </div>
-
-      {unassignedProfiles.length > 0 && (
-          <div className="border-t pt-8">
-              <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
-                  <UserCog className="text-orange-500" />
-                  Unassigned / Disconnected Users
-              </h2>
-              <p className="text-slate-500 mb-6">These users are not linked to the main hierarchy tree. Assign them a manager to move them up.</p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {unassignedProfiles.map(p => (
-                      <div key={p.id} className="scale-90 origin-top-left">
-                          <NodeCard profile={p} />
-                      </div>
-                  ))}
-              </div>
-          </div>
-      )}
 
 
 
