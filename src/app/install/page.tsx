@@ -69,7 +69,7 @@ export default function InstallPage() {
         <CardHeader className="text-center pb-2">
           <div className="mx-auto mb-4 h-20 w-20 overflow-hidden rounded-2xl shadow-lg">
             <Image
-              src="/timedesk-logo.png"
+              src="/timedesk-icon.png"
               alt="Logo"
               width={80}
               height={80}
@@ -80,7 +80,7 @@ export default function InstallPage() {
             Install TimeDesk
           </CardTitle>
           <CardDescription className="text-slate-600">
-            Add to your home screen for the best experience.
+            Smart Attendance. Seamless Workflow.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
