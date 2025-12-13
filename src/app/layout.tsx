@@ -15,6 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "TimeDesk",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
   description: "TimeDesk is a comprehensive, role-based attendance and leave management system designed for modern organizations. Seamlessly manage attendance, leaves, and reporting for Employees, Managers, HR, and Admins.",
   manifest: "/manifest.json",
   icons: {

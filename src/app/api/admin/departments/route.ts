@@ -14,17 +14,37 @@ export async function GET() {
         // Supabase doesn't have a distinct() modifier easily on select, 
         // we fetch column and distinct in JS or use .rpc if needed. 
         // For small number of profiles, JS distinct is fine.
-        const { data, error } = await supabaseAdmin
+        // 1. Fetch from 'department_leave_limits' (The configured departments)
+        // using supabaseAdmin to bypass policies if needed, though they are usually open.
+        const { data: limitsData, error: limitsError } = await supabaseAdmin
+            .from('department_leave_limits')
+            .select('department');
+
+        if (limitsError) throw limitsError;
+
+        // 2. Fetch from 'profiles' (To catch any departments assigned to users but not configured)
+        const { data: profilesData, error: profilesError } = await supabaseAdmin
             .from('profiles')
             .select('department');
 
-        if (error) throw error;
+        if (profilesError) throw profilesError;
 
-        // Extract unique non-null departments
-        const departments = Array.from(new Set(
-            data?.map(p => p.department)
-            .filter(d => d && d.trim() !== '')
-        )).sort();
+        // Merge and Distinct
+        const depts = new Set<string>();
+        
+        limitsData?.forEach(item => {
+            if (item.department && item.department.trim()) {
+                depts.add(item.department.trim());
+            }
+        });
+
+        profilesData?.forEach(item => {
+            if (item.department && item.department.trim()) {
+                depts.add(item.department.trim());
+            }
+        });
+
+        const departments = Array.from(depts).sort();
 
         return NextResponse.json(departments);
 

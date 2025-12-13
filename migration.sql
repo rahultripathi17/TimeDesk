@@ -13,6 +13,8 @@ create table public.profiles (
   department text,
   date_of_joining date,
   reporting_managers uuid[],
+  employment_type text check (employment_type in ('full_time', 'part_time', 'intern')),
+  work_config jsonb, -- { "weekly_off": ["Saturday", "Sunday"], "shift_start": "09:30", "shift_end": "18:30" }
   created_at timestamptz default now()
 );
 
@@ -31,7 +33,8 @@ create table public.user_details (
   aadhaar_number text,
   bank_name text,
   account_number text,
-  ifsc_code text
+  ifsc_code text,
+  salary numeric
 );
 
 -- 3. Attendance Table
@@ -39,9 +42,12 @@ create table public.attendance (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references public.profiles(id) on delete cascade not null,
   date date not null,
-  status text check (status in ('available', 'remote', 'leave', 'absent')),
+  status text check (status in ('available', 'remote', 'leave', 'absent', 'extra_work', 'regularization')),
   check_in timestamptz,
   check_out timestamptz,
+  location_snapshot jsonb, -- Stores { check_in: {lat, lng}, check_out: {lat, lng} }
+  duration_minutes integer, -- Total session minutes
+  deviation_minutes integer, -- Difference from min working hours
   created_at timestamptz default now()
 );
 
@@ -55,6 +61,8 @@ create table public.leaves (
   reason text,
   status text default 'pending' check (status in ('pending', 'approved', 'rejected')),
   approver_id uuid references public.profiles(id),
+  session text, -- 'first_half', 'second_half' for half days
+  duration numeric, -- Number of days (e.g. 0.5, 1, 2)
   created_at timestamptz default now()
 );
 
@@ -64,85 +72,12 @@ create table public.department_leave_limits (
   department text not null,
   leave_type text not null,
   limit_days integer not null default 0,
+  color text default '#3b82f6',
+  is_paid boolean default true,
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
   unique(department, leave_type)
 );
-
--- Enable Row Level Security (RLS)
-alter table public.profiles enable row level security;
-alter table public.user_details enable row level security;
-alter table public.attendance enable row level security;
-alter table public.leaves enable row level security;
-alter table public.department_leave_limits enable row level security;
-
--- Policies (Simplified for initial setup)
--- Profiles: Readable by everyone (authenticated), Writable by self (for now, or admin)
-create policy "Public profiles are viewable by everyone."
-  on profiles for select
-  using ( true );
-
-create policy "Users can insert their own profile."
-  on profiles for insert
-  with check ( auth.uid() = id );
-
-create policy "Users can update own profile."
-  on profiles for update
-  using ( auth.uid() = id );
-
--- User Details: Readable by self
-create policy "User details are viewable by owner."
-  on user_details for select
-  using ( auth.uid() = id );
-
-create policy "Users can insert their own details."
-  on user_details for insert
-  with check ( auth.uid() = id );
-
--- Attendance: Readable by everyone (for dashboard stats), Writable by self
-create policy "Attendance is viewable by everyone."
-  on attendance for select
-  using ( true );
-
-create policy "Users can insert their own attendance."
-  on attendance for insert
-  with check ( auth.uid() = user_id );
-
-create policy "Users can update their own attendance."
-  on attendance for update
-  using ( auth.uid() = user_id );
-
--- Leaves: Readable by everyone (for calendar), Writable by self
-create policy "Leaves are viewable by everyone."
-  on leaves for select
-  using ( true );
-
-create policy "Users can insert their own leaves."
-  on leaves for insert
-  with check ( auth.uid() = user_id );
-
--- Department Leave Limits: Readable by everyone, Writable by admin
-create policy "Leave limits are viewable by everyone."
-  on department_leave_limits for select
-  using ( true );
-
-create policy "Only admins can insert leave limits."
-  on department_leave_limits for insert
-  with check (
-    exists (
-      select 1 from profiles
-      where id = auth.uid() and role = 'admin'
-    )
-  );
-
-create policy "Only admins can update leave limits."
-  on department_leave_limits for update
-  using (
-    exists (
-      select 1 from profiles
-      where id = auth.uid() and role = 'admin'
-    )
-  );
 
 -- 6. System Settings Table
 create table public.system_settings (
@@ -152,69 +87,7 @@ create table public.system_settings (
   updated_at timestamptz default now()
 );
 
--- Enable RLS
-alter table public.system_settings enable row level security;
-
--- Policies
-create policy "System settings are viewable by everyone."
-  on system_settings for select
-  using ( true );
-
-create policy "Only admins can insert system settings."
-  on system_settings for insert
-  with check (
-    exists (
-      select 1 from profiles
-      where id = auth.uid() and role = 'admin'
-    )
-  );
-
-create policy "Only admins can update system settings."
-  on system_settings for update
-  using (
-    exists (
-      select 1 from profiles
-      where id = auth.uid() and role = 'admin'
-    )
-  );
-
--- Initial Seed
-insert into public.system_settings (key, value)
-values ('leave_reset_date', '2024-01-01')
-on conflict (key) do nothing;
-
--- 7. Add work_config to profiles
-alter table public.profiles 
-add column if not exists work_config jsonb;
-
--- 8. Add employment_type to profiles
-alter table public.profiles
-add column if not exists employment_type text check (employment_type in ('full_time', 'part_time', 'intern'));
-
--- 9. Add salary to user_details
-alter table public.user_details
-add column if not exists salary numeric;
-
--- 10. Add color to department_leave_limits
-alter table public.department_leave_limits
-add column if not exists color text default '#3b82f6';
-
--- 11. Additional Policies
-create policy "Only admins can delete leave limits."
-  on department_leave_limits for delete
-  using (
-    exists (
-      select 1 from profiles
-      where id = auth.uid() and role = 'admin'
-    )
-  );
-
--- 12. Additional Seed Data
-insert into public.system_settings (key, value)
-values ('common_info', 'Welcome to the Notice Board! Important announcements will appear here.')
-on conflict (key) do nothing;
-
--- 13. Office Locations Table
+-- 7. Office Locations Table
 create table public.office_locations (
   id uuid default gen_random_uuid() primary key,
   name text not null,
@@ -224,91 +97,122 @@ create table public.office_locations (
   created_at timestamptz default now()
 );
 
--- Enable RLS for Office Locations
+-- 8. Department Policies Management
+create table public.department_policies (
+    id uuid default gen_random_uuid() primary key,
+    department text not null unique,
+    is_enabled boolean default false,
+    policy_url text,
+    created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+    updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 9. Holiday Calendar Table
+create table public.holidays (
+    id uuid default gen_random_uuid() primary key,
+    name text not null,
+    date date not null,
+    departments text[], -- Array of department names. If null/empty, applies to all.
+    created_at timestamptz default now(),
+    updated_at timestamptz default now()
+);
+
+-- ==========================================
+-- Row Level Security (RLS) & Policies
+-- ==========================================
+
+-- Enable RLS
+alter table public.profiles enable row level security;
+alter table public.user_details enable row level security;
+alter table public.attendance enable row level security;
+alter table public.leaves enable row level security;
+alter table public.department_leave_limits enable row level security;
+alter table public.system_settings enable row level security;
 alter table public.office_locations enable row level security;
+alter table public.department_policies enable row level security;
+alter table public.holidays enable row level security;
 
-create policy "Office locations are viewable by everyone."
-  on office_locations for select
-  using ( true );
+-- Profiles Policies
+create policy "Public profiles are viewable by everyone." on profiles for select using (true);
+create policy "Users can insert their own profile." on profiles for insert with check (auth.uid() = id);
+create policy "Users can update own profile." on profiles for update using (auth.uid() = id);
 
-create policy "Only admins can insert office locations."
-  on office_locations for insert
-  with check (
-    exists (
-      select 1 from profiles
-      where id = auth.uid() and role = 'admin'
-    )
-  );
+-- User Details Policies
+create policy "User details are viewable by owner." on user_details for select using (auth.uid() = id);
+create policy "Users can insert their own details." on user_details for insert with check (auth.uid() = id);
 
-create policy "Only admins can update office locations."
-  on office_locations for update
-  using (
-    exists (
-      select 1 from profiles
-      where id = auth.uid() and role = 'admin'
-    )
-  );
+-- Attendance Policies
+create policy "Attendance is viewable by everyone." on attendance for select using (true);
+create policy "Users can insert their own attendance." on attendance for insert with check (auth.uid() = user_id);
+create policy "Users can update their own attendance." on attendance for update using (auth.uid() = user_id);
 
-create policy "Only admins can delete office locations."
-  on office_locations for delete
-  using (
-    exists (
-      select 1 from profiles
-      where id = auth.uid() and role = 'admin'
-    )
-  );
+-- Leaves Policies
+create policy "Leaves are viewable by everyone." on leaves for select using (true);
+create policy "Users can insert their own leaves." on leaves for insert with check (auth.uid() = user_id);
 
--- 14. Update Attendance Table with Location columns
-alter table public.attendance
-add column if not exists location_snapshot jsonb, -- Stores { check_in: {lat, lng}, check_out: {lat, lng} }
-add column if not exists duration_minutes integer, -- Total session minutes
-add column if not exists deviation_minutes integer; -- Difference from min working hours
+-- Department Leave Limits Policies
+create policy "Leave limits are viewable by everyone." on department_leave_limits for select using (true);
+create policy "Only admins can insert leave limits." on department_leave_limits for insert with check (exists (select 1 from profiles where id = auth.uid() and role = 'admin'));
+create policy "Only admins can update leave limits." on department_leave_limits for update using (exists (select 1 from profiles where id = auth.uid() and role = 'admin'));
+create policy "Only admins can delete leave limits." on department_leave_limits for delete using (exists (select 1 from profiles where id = auth.uid() and role = 'admin'));
+
+-- System Settings Policies
+create policy "System settings are viewable by everyone." on system_settings for select using (true);
+create policy "Only admins can insert system settings." on system_settings for insert with check (exists (select 1 from profiles where id = auth.uid() and role = 'admin'));
+create policy "Only admins can update system settings." on system_settings for update using (exists (select 1 from profiles where id = auth.uid() and role = 'admin'));
+
+-- Office Locations Policies
+create policy "Office locations are viewable by everyone." on office_locations for select using (true);
+create policy "Only admins can insert office locations." on office_locations for insert with check (exists (select 1 from profiles where id = auth.uid() and role = 'admin'));
+create policy "Only admins can update office locations." on office_locations for update using (exists (select 1 from profiles where id = auth.uid() and role = 'admin'));
+create policy "Only admins can delete office locations." on office_locations for delete using (exists (select 1 from profiles where id = auth.uid() and role = 'admin'));
+
+-- Department Policies Policies
+create policy "Admins can manage policies" on department_policies for all using (exists (select 1 from profiles where id = auth.uid() and role = 'admin'));
+create policy "Users can view enabled policies for their department" on department_policies for select using (is_enabled = true and department = (select department from profiles where id = auth.uid()));
+
+-- Holiday Policies
+create policy "Enable read access for all users" on holidays for select to authenticated using (true);
+create policy "Enable write access for admins" on holidays for all to authenticated using (exists (select 1 from profiles where profiles.id = auth.uid() and profiles.role = 'admin'));
 
 
--- 15. Session Management Functions
--- Get Sessions (Fixes ambiguous column name issue)
+-- ==========================================
+-- Functions & Triggers
+-- ==========================================
+
+-- Get User Sessions
 create or replace function get_user_sessions(p_user_id uuid)
 returns setof auth.sessions
-language sql
-security definer
-set search_path = ''
+language sql security definer set search_path = ''
 as $$
   select * from auth.sessions where user_id = p_user_id order by created_at desc;
 $$;
 
--- Delete specific session
+-- Delete Session
 create or replace function delete_session(p_session_id uuid)
 returns void
-language sql
-security definer
-set search_path = ''
+language sql security definer set search_path = ''
 as $$
   delete from auth.sessions where id = p_session_id;
 $$;
 
--- Delete all sessions for user
+-- Delete All User Sessions
 create or replace function delete_all_user_sessions(p_user_id uuid)
 returns void
-language sql
-security definer
-set search_path = ''
+language sql security definer set search_path = ''
 as $$
   delete from auth.sessions where user_id = p_user_id;
 $$;
 
--- 16. Max 4 Sessions Trigger
+-- Max Usage (4 Sessions) Trigger
 create or replace function maintain_session_limit()
 returns trigger
-language plpgsql
-security definer
+language plpgsql security definer
 as $$
 declare
   v_count integer;
 begin
-  -- Check session count for the user
   select count(*) into v_count from auth.sessions where user_id = NEW.user_id;
-  
-  -- If more than 4, delete the oldest ones
   if v_count > 4 then
     delete from auth.sessions
     where id in (
@@ -322,45 +226,81 @@ begin
 end;
 $$;
 
--- Create the trigger (dropped first to ensure idempotency)
 drop trigger if exists on_auth_session_created on auth.sessions;
-create trigger on_auth_session_created
   after insert on auth.sessions
   for each row execute procedure maintain_session_limit();
 
 
--- Department Policies Management
-create table if not exists public.department_policies (
-    id uuid default gen_random_uuid() primary key,
-    department text not null unique,
-    is_enabled boolean default false,
-    policy_url text, -- Google Drive view-only link
-    created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-    updated_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
+-- Get All Birthdays (RPC for Birthday Slider)
+create or replace function get_all_birthdays()
+returns table (
+  id uuid,
+  full_name text,
+  avatar_url text,
+  role text,
+  designation text,
+  department text,
+  date_of_joining date,
+  dob date
+)
+language sql
+security definer
+set search_path = ''
+as $$
+  select 
+    p.id,
+    p.full_name,
+    p.avatar_url,
+    p.role,
+    p.designation,
+    p.department,
+    p.date_of_joining,
+    ud.dob
+  from public.profiles p
+  join public.user_details ud on p.id = ud.id
+  where ud.dob is not null
+  -- Optional: active employees only? usually yes
+  -- and p.role != 'term' -- if we had a status
+  ;
+$$;
 
--- Enable RLS
-alter table public.department_policies enable row level security;
 
--- Policies for department_policies
-create policy "Admins can manage policies"
-    on public.department_policies
-    for all
-    using (
-        exists (
-            select 1 from public.profiles
-            where profiles.id = auth.uid()
-            and profiles.role = 'admin'
-        )
-    );
+-- Check User Exists (RPC for Login Page)
+create or replace function check_user_exists(email_input text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  _exists boolean;
+begin
+  select exists(
+    select 1 from auth.users
+    where email ilike email_input
+  ) into _exists;
+  
+  return _exists;
+end;
+$$;
 
-create policy "Users can view enabled policies for their department"
-    on public.department_policies
-    for select
-    using (
-        is_enabled = true
-        and department = (
-            select department from public.profiles
-            where profiles.id = auth.uid()
-        )
-    );
+
+-- ==========================================
+-- Seed Data
+-- ==========================================
+
+-- System Settings
+insert into public.system_settings (key, value) values 
+('leave_reset_date', '2025-01-01'),
+('common_info', 'Welcome to the Notice Board! Important announcements will appear here.')
+on conflict (key) do nothing;
+
+-- Holidays (2025)
+insert into public.holidays (name, date, departments) values
+('New Year''s Day', '2025-01-01', NULL),
+('Republic Day', '2025-01-26', NULL),
+('Holi', '2025-03-14', NULL),
+('Independence Day', '2025-08-15', NULL),
+('Gandhi Jayanti', '2025-10-02', NULL),
+('Diwali', '2025-10-20', NULL),
+('Christmas', '2025-12-25', NULL);
