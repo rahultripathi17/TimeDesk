@@ -40,6 +40,7 @@ export default function DashboardPage() {
     | "available_before_leave"
     | "leave_second_half"
     | "extra_work"
+    | "regularization"
     | null
   >(null);
   const [selectedStatus, setSelectedStatus] = useState<
