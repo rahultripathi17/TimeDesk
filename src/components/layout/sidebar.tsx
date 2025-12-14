@@ -86,12 +86,12 @@ const managerExtra: NavItem[] = [
   { label: "Team Attendance", href: "/manager/attendance", icon: CalendarDays },
   {
     label: "Leaves",
-    href: "/admin/leaves",
+    href: "/manager/leaves/approvals", // Redirects to approvals for now
     icon: CalendarPlus,
     children: [
       {
         label: "Approvals",
-        href: "/admin/leaves",
+        href: "/manager/leaves/approvals",
         icon: ClipboardCheck,
         exact: true,
       },
@@ -121,7 +121,7 @@ const hrExtra: NavItem[] = [
     children: [
       {
         label: "Approvals",
-        href: "/admin/leaves",
+        href: "/hr/leaves/approvals",
         icon: ClipboardCheck,
         exact: true,
       },
