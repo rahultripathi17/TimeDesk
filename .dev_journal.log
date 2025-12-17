@@ -28,3 +28,4 @@
 [2025-12-16 13:34:35 +0530] Add secure encrypted shared preferences for token storage
 [2025-12-16 17:43:35 +0530] Add logic to calculate total weekly and monthly hours
 [2025-12-17 20:43:05 +0530] Implement Clock In / Clock Out button logic
+[2025-12-17 16:50:08 +0530] Setup background WorkManager to sync offline clock-ins
