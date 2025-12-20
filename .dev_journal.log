@@ -30,3 +30,4 @@
 [2025-12-17 20:43:05 +0530] Implement Clock In / Clock Out button logic
 [2025-12-17 16:50:08 +0530] Setup background WorkManager to sync offline clock-ins
 [2025-12-20 20:05:50 +0530] Add monthly export feature (CSV/PDF) for HR reporting
+[2025-12-20 11:31:00 +0530] Implement RecyclerView for daily time logs
