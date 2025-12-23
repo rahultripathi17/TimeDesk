@@ -36,3 +36,4 @@
 [2025-12-22 21:24:05 +0530] Fix padding on BottomNavigationView
 [2025-12-22 09:12:27 +0530] Configure build.gradle and dependencies for Room and Retrofit
 [2025-12-23 18:09:29 +0530] Implement JWT token interception using OkHttp
+[2025-12-23 22:08:39 +0530] Integrate Firebase Cloud Messaging service
