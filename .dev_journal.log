@@ -35,3 +35,4 @@
 [2025-12-22 09:31:04 +0530] Add in-app update checker utility
 [2025-12-22 21:24:05 +0530] Fix padding on BottomNavigationView
 [2025-12-22 09:12:27 +0530] Configure build.gradle and dependencies for Room and Retrofit
+[2025-12-23 18:09:29 +0530] Implement JWT token interception using OkHttp
