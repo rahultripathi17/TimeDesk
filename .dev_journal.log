@@ -43,3 +43,4 @@
 [2025-12-29 18:29:13 +0530] Fix timezone offset bug in time log submissions
 [2025-12-29 21:03:12 +0530] Implement strict mode to monitor main thread performance
 [2025-12-30 13:12:05 +0530] Initial setup for TimeDesk repository
+[2026-01-01 17:02:48 +0530] Add skeleton loaders to the manager dashboard
