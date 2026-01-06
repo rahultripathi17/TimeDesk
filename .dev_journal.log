@@ -47,3 +47,4 @@
 [2026-01-03 21:57:19 +0530] Add drag-and-drop support for moving tasks across columns
 [2026-01-04 13:56:05 +0530] Add Lottie animation for successful clock-in
 [2026-01-06 09:39:45 +0530] Add custom pie chart for leave balance using MPAndroidChart
+[2026-01-06 16:38:33 +0530] Add multi-language string support (English, Spanish, French)
