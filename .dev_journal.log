@@ -48,3 +48,4 @@
 [2026-01-04 13:56:05 +0530] Add Lottie animation for successful clock-in
 [2026-01-06 09:39:45 +0530] Add custom pie chart for leave balance using MPAndroidChart
 [2026-01-06 16:38:33 +0530] Add multi-language string support (English, Spanish, French)
+[2026-01-09 21:09:07 +0530] Clean up unused XML layouts and drawable resources
