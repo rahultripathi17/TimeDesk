@@ -56,3 +56,4 @@
 [2026-01-16 12:08:12 +0530] Add custom haptic feedback when clocking in
 [2026-01-18 13:29:21 +0530] Implement Pending Leaves status screen
 [2026-01-18 09:49:52 +0530] Implement Deep Links for opening specific task details
+[2026-01-21 13:59:54 +0530] Handle location permission denial gracefully
